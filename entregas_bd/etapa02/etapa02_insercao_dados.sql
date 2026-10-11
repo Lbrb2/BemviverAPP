@@ -2496,7 +2496,14 @@ INSERT INTO intercorrencia (id_idoso, id_profissional, tipo, gravidade, local_ev
  (10, 8, 'outro', 'leve', 'Sala de TV', 'Engasgo leve com líquido', 'Manobra de desobstrução não necessária; avaliar espessante', FALSE, now() - INTERVAL '19 days 2 hours'),
  (29, 4, 'lesao', 'grave', 'Pátio', 'Escoriação no antebraço', 'Curativo simples', TRUE, now() - INTERVAL '71 days 14 hours'),
  (31, 29, 'queda', 'moderada', 'Corredor', 'Escorregou no piso molhado', 'Gelo local; observação por 24h', TRUE, now() - INTERVAL '87 days 17 hours'),
- (21, 1, 'mal_estar', 'leve', 'Refeitório', 'Tontura e sudorese após o almoço', 'Aferida glicemia; repouso', TRUE, now() - INTERVAL '66 days 17 hours');
+ (21, 1, 'mal_estar', 'leve', 'Refeitório', 'Tontura e sudorese após o almoço', 'Aferida glicemia; repouso', TRUE, now() - INTERVAL '66 days 17 hours'),
+ (9, (SELECT id_profissional FROM profissional WHERE id_usuario = 6), 'queda', 'leve', 'Quarto', 'Queda ao tentar sair da cama sem ajuda', 'Avaliada pela enfermagem; grade lateral à noite', FALSE, now() - INTERVAL '12 days 7 hours'),
+ (9, (SELECT id_profissional FROM profissional WHERE id_usuario = 6), 'queda', 'moderada', 'Banheiro', 'Escorregou no box durante o banho', 'Curativo; tapete antiderrapante solicitado', TRUE, now() - INTERVAL '63 days 7 hours'),
+ (3, (SELECT id_profissional FROM profissional WHERE id_usuario = 6), 'queda', 'moderada', 'Quarto', 'Deslizou da poltrona para o chão', 'Sem fratura aparente; avaliar transferência com dois cuidadores', TRUE, now() - INTERVAL '30 days 7 hours'),
+ (17, (SELECT id_profissional FROM profissional WHERE id_usuario = 6), 'queda', 'leve', 'Corredor', 'Desequilíbrio ao caminhar sem o andador', 'Reforçado o uso do andador', FALSE, now() - INTERVAL '5 days 7 hours'),
+ (4, (SELECT id_profissional FROM profissional WHERE id_usuario = 9), 'queda', 'moderada', 'Pátio', 'Tropeçou no degrau do pátio', 'Gelo local; família avisada', TRUE, now() - INTERVAL '20 days 7 hours');
+INSERT INTO meta_cuidado (id_idoso, id_profissional, categoria, descricao, status, data_criacao, data_revisao) VALUES
+ (3, (SELECT id_profissional FROM profissional WHERE id_usuario = 6), 'mobilidade', 'Transferência cama-poltrona sempre com dois cuidadores; fisioterapia 3x por semana', 'ativa', CURRENT_DATE - 28, CURRENT_DATE + 14);
 
 -- ---------- Restrições alimentares ----------
 INSERT INTO restricao_alimentar (id_idoso, descricao) VALUES

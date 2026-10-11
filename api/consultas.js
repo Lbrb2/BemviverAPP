@@ -4,6 +4,10 @@
 // consultas_etapa03.sql é gerado a partir daqui (node gerar_sql_consultas.js),
 // então o que o professor lê é exatamente o que a interface roda.
 //
+// Parâmetro: as consultas com "periodo" recebem $1 = nº de dias da janela
+// (escolhido na tela entre as "opcoes"). A API passa o valor separado do
+// SQL — c.query(sql, [dias]) —, nunca concatenado no texto.
+//
 // Executadas via comUsuario(): o RLS recorta tudo para a ILPI de quem
 // está logado. Rodadas como superusuário no psql, mostram todas as ILPIs.
 // ============================================================
@@ -11,9 +15,10 @@
 export const CONSULTAS = [
   {
     id: 1,
-    titulo: "Bem-estar médio por residente (30 dias)",
-    pergunta: "Como cada residente tem se sentido no último mês?",
-    tecnicas: ["INNER JOIN", "GROUP BY", "AVG", "STDDEV_SAMP"],
+    titulo: "Bem-estar médio por residente",
+    pergunta: "Como cada residente tem se sentido no período?",
+    tecnicas: ["INNER JOIN", "GROUP BY", "AVG", "STDDEV_SAMP", "parâmetro $1"],
+    periodo: { padrao: 30, opcoes: [7, 30, 90] },
     grafico: { tipo: "barras", x: "residente", y: ["humor_medio"], max: 5, rotulo: "Humor médio (1 a 5)" },
     sql: `SELECT i.nome                          AS residente,
        count(r.id_registro)            AS registros,
@@ -24,7 +29,7 @@ export const CONSULTAS = [
   FROM idoso i
   JOIN registro_bem_estar r ON r.id_idoso = i.id_idoso
  WHERE i.ativo
-   AND r.data_hora >= now() - INTERVAL '30 days'
+   AND r.data_hora >= now() - make_interval(days => $1::int)
  GROUP BY i.id_idoso, i.nome
  ORDER BY humor_medio DESC, i.nome`,
   },
@@ -54,7 +59,8 @@ HAVING max(r.data_hora) IS NULL
     id: 3,
     titulo: "Distribuição da dor relatada (histograma)",
     pergunta: "Com que frequência aparece cada nível de dor (0 a 10)?",
-    tecnicas: ["generate_series", "LEFT JOIN", "função de janela SUM() OVER ()"],
+    tecnicas: ["generate_series", "LEFT JOIN", "função de janela SUM() OVER ()", "parâmetro $1"],
+    periodo: { padrao: 30, opcoes: [7, 30, 90] },
     grafico: { tipo: "barras", x: "nivel_dor", y: ["frequencia"], rotulo: "Nº de registros por nível de dor" },
     sql: `SELECT n.nivel                         AS nivel_dor,
        count(r.id_registro)            AS frequencia,
@@ -63,30 +69,51 @@ HAVING max(r.data_hora) IS NULL
   FROM generate_series(0, 10) AS n(nivel)
   LEFT JOIN registro_bem_estar r
          ON r.dor = n.nivel
-        AND r.data_hora >= now() - INTERVAL '30 days'
+        AND r.data_hora >= now() - make_interval(days => $1::int)
  GROUP BY n.nivel
  ORDER BY n.nivel`,
   },
   {
     id: 4,
-    titulo: "Evolução semanal do humor e da dor",
+    titulo: "Evolução semanal do humor e da dor (8 semanas)",
     pergunta: "A casa está melhorando ou piorando semana a semana?",
-    tecnicas: ["date_trunc", "GROUP BY por período", "AVG"],
-    grafico: { tipo: "linhas", x: "semana", y: ["humor_medio", "dor_media"], rotulo: "Médias semanais" },
-    sql: `SELECT to_char(date_trunc('week', r.data_hora), 'DD/MM') AS semana,
-       round(avg(r.humor), 2)          AS humor_medio,
-       round(avg(r.dor), 2)            AS dor_media,
-       count(*)                        AS registros
-  FROM registro_bem_estar r
- WHERE r.data_hora >= now() - INTERVAL '8 weeks'
- GROUP BY date_trunc('week', r.data_hora)
- ORDER BY date_trunc('week', r.data_hora)`,
+    tecnicas: ["CTE (WITH)", "generate_series de semanas", "LEFT JOIN por intervalo", "função de janela LAG()"],
+    grafico: { tipo: "linhas", x: "semana", y: ["humor_medio", "dor_media"],
+               rotulo: "Médias por semana (segunda a domingo) — * semana em andamento" },
+    // Semanas inteiras, de segunda a domingo: a janela começa na segunda-feira
+    // de 7 semanas atrás (e não "8 semanas antes de agora", que cortaria a
+    // primeira semana no meio). Semanas sem registro aparecem vazias.
+    sql: `WITH semanas AS (
+    SELECT generate_series(date_trunc('week', now()) - INTERVAL '7 weeks',
+                           date_trunc('week', now()),
+                           INTERVAL '1 week') AS inicio
+), medias AS (
+    SELECT s.inicio,
+           round(avg(r.humor), 2)      AS humor_medio,
+           round(avg(r.dor), 2)        AS dor_media,
+           count(r.id_registro)        AS registros
+      FROM semanas s
+      LEFT JOIN registro_bem_estar r
+             ON r.data_hora >= s.inicio
+            AND r.data_hora <  s.inicio + INTERVAL '1 week'
+     GROUP BY s.inicio
+)
+SELECT to_char(inicio, 'DD/MM')
+       || CASE WHEN inicio = date_trunc('week', now()) THEN '*' ELSE '' END AS semana,
+       humor_medio,
+       humor_medio - lag(humor_medio) OVER (ORDER BY inicio) AS variacao_humor,
+       dor_media,
+       dor_media - lag(dor_media) OVER (ORDER BY inicio)     AS variacao_dor,
+       registros
+  FROM medias
+ ORDER BY inicio`,
   },
   {
     id: 5,
     titulo: "Aceitação alimentar por grau de dependência",
     pergunta: "Residentes mais dependentes estão comendo menos?",
-    tecnicas: ["INNER JOIN", "GROUP BY", "COUNT ... FILTER", "AVG"],
+    tecnicas: ["INNER JOIN", "GROUP BY", "COUNT ... FILTER", "AVG", "parâmetro $1"],
+    periodo: { padrao: 30, opcoes: [7, 30, 90] },
     grafico: { tipo: "barras", x: "grau_dependencia", y: ["aceitacao_media"], max: 100, rotulo: "Aceitação média (%)" },
     sql: `SELECT 'Grau ' || i.grau_dependencia   AS grau_dependencia,
        count(DISTINCT i.id_idoso)      AS residentes,
@@ -97,15 +124,16 @@ HAVING max(r.data_hora) IS NULL
   FROM registro_refeicao rf
   JOIN idoso i ON i.id_idoso = rf.id_idoso
  WHERE i.ativo
-   AND rf.data_hora >= now() - INTERVAL '30 days'
+   AND rf.data_hora >= now() - make_interval(days => $1::int)
  GROUP BY i.grau_dependencia
  ORDER BY i.grau_dependencia`,
   },
   {
     id: 6,
-    titulo: "Intercorrências por tipo e gravidade (90 dias)",
+    titulo: "Intercorrências por tipo e gravidade",
     pergunta: "Que tipo de ocorrência mais acontece e quão grave ela é?",
-    tecnicas: ["GROUP BY", "COUNT ... FILTER", "porcentagem com agregação"],
+    tecnicas: ["GROUP BY", "COUNT ... FILTER", "porcentagem com agregação", "parâmetro $1"],
+    periodo: { padrao: 90, opcoes: [30, 90, 180] },
     grafico: { tipo: "barras", x: "tipo", y: ["total"], rotulo: "Nº de intercorrências" },
     sql: `SELECT ic.tipo::text                   AS tipo,
        count(*)                        AS total,
@@ -114,24 +142,27 @@ HAVING max(r.data_hora) IS NULL
        count(*) FILTER (WHERE ic.gravidade = 'grave')    AS graves,
        round(100.0 * count(*) FILTER (WHERE ic.familia_avisada) / count(*), 0) AS pct_familia_avisada
   FROM intercorrencia ic
- WHERE ic.data_hora >= now() - INTERVAL '90 days'
+ WHERE ic.data_hora >= now() - make_interval(days => $1::int)
  GROUP BY ic.tipo
  ORDER BY total DESC`,
   },
   {
     id: 7,
-    titulo: "Adesão à medicação (7 últimos dias completos)",
+    titulo: "Adesão à medicação (dias completos)",
     pergunta: "Das doses que deveriam ter sido dadas, quantas foram registradas?",
-    tecnicas: ["CTE (WITH)", "CROSS JOIN LATERAL unnest(array)", "generate_series", "LEFT JOIN"],
+    tecnicas: ["CTE (WITH)", "CROSS JOIN LATERAL unnest(array)", "generate_series", "LEFT JOIN", "parâmetro $1"],
+    periodo: { padrao: 7, opcoes: [7, 30, 90] },
     grafico: { tipo: "barras", x: "residente", y: ["adesao_pct"], max: 100, rotulo: "Adesão (%)", alerta_abaixo: 90 },
+    // Conta os dias completos (ontem para trás). A prescrição vale de
+    // "inicio" até "fim": não se filtra por "ativo", senão encerrar uma
+    // prescrição hoje apagaria as doses que eram devidas nos dias anteriores.
     sql: `WITH previstas AS (
     SELECT p.id_prescricao, p.id_idoso,
            (d::date + h)               AS horario
       FROM prescricao p
      CROSS JOIN LATERAL unnest(p.horarios) AS h
-     CROSS JOIN generate_series(CURRENT_DATE - 7, CURRENT_DATE - 1, INTERVAL '1 day') AS d
-     WHERE p.ativo
-       AND d::date BETWEEN p.inicio AND COALESCE(p.fim, CURRENT_DATE)
+     CROSS JOIN generate_series(CURRENT_DATE - $1::int, CURRENT_DATE - 1, INTERVAL '1 day') AS d
+     WHERE d::date BETWEEN p.inicio AND COALESCE(p.fim, CURRENT_DATE)
 )
 SELECT i.nome                          AS residente,
        count(*)                        AS doses_previstas,
@@ -147,40 +178,142 @@ SELECT i.nome                          AS residente,
   },
   {
     id: 8,
-    titulo: "Ranking de engajamento (Xodó, lazer e check-ins)",
+    titulo: "Ranking de engajamento (check-ins, lazer e Xodó)",
     pergunta: "Quem está mais ativo — e quem está se isolando?",
-    tecnicas: ["3 CTEs", "LEFT JOIN múltiplo", "função de janela RANK()"],
-    grafico: { tipo: "barras", x: "residente", y: ["pontos_xodo_30d"], rotulo: "Pontos do Xodó em 30 dias" },
+    tecnicas: ["4 CTEs", "LEFT JOIN múltiplo", "funções de janela RANK(), PERCENT_RANK() e MAX() OVER ()", "parâmetro $1"],
+    periodo: { padrao: 30, opcoes: [7, 30, 90] },
+    grafico: { tipo: "barras", x: "residente", y: ["indice_engajamento"], max: 100,
+               rotulo: "Índice de engajamento (0 a 100)", alerta_abaixo: 25 },
+    // Índice = 40% check-ins + 40% atividades + 20% pontos do Xodó, cada um
+    // dividido pelo maior valor da casa no período (0 a 1). Os pontos pesam
+    // menos porque já nascem, em parte, dos próprios check-ins e atividades.
+    // Quartil pela posição relativa (PERCENT_RANK): empatados ficam no mesmo
+    // quartil; 1 = quarto da casa menos engajado.
     sql: `WITH pontos AS (
     SELECT pv.id_idoso, sum(e.pontos_ganhos) AS pontos
       FROM pet_virtual pv
       JOIN evento_pet e ON e.id_pet = pv.id_pet
-     WHERE e.data_hora >= now() - INTERVAL '30 days'
+     WHERE e.data_hora >= now() - make_interval(days => $1::int)
      GROUP BY pv.id_idoso
 ), lazer AS (
     SELECT p.id_idoso, count(*) AS atividades
       FROM participacao p
       JOIN atividade_lazer a ON a.id_atividade = p.id_atividade
-     WHERE a.data_hora >= now() - INTERVAL '30 days'
+     WHERE a.data_hora >= now() - make_interval(days => $1::int)
+       AND a.data_hora <= now()
      GROUP BY p.id_idoso
 ), checkins AS (
     SELECT id_idoso, count(*) AS checkins
       FROM registro_bem_estar
-     WHERE data_hora >= now() - INTERVAL '30 days'
+     WHERE data_hora >= now() - make_interval(days => $1::int)
      GROUP BY id_idoso
+), base AS (
+    SELECT i.nome                      AS residente,
+           pv.nome                     AS xodo,
+           COALESCE(c.checkins, 0)     AS checkins,
+           COALESCE(l.atividades, 0)   AS atividades,
+           COALESCE(pt.pontos, 0)      AS pontos_xodo
+      FROM idoso i
+      LEFT JOIN pet_virtual pv ON pv.id_idoso = i.id_idoso
+      LEFT JOIN pontos   pt ON pt.id_idoso = i.id_idoso
+      LEFT JOIN lazer    l  ON l.id_idoso  = i.id_idoso
+      LEFT JOIN checkins c  ON c.id_idoso  = i.id_idoso
+     WHERE i.ativo
+), indice AS (
+    SELECT *,
+           round(100 * (
+               0.4 * COALESCE(checkins    / NULLIF(max(checkins)    OVER (), 0)::numeric, 0)
+             + 0.4 * COALESCE(atividades  / NULLIF(max(atividades)  OVER (), 0)::numeric, 0)
+             + 0.2 * COALESCE(pontos_xodo / NULLIF(max(pontos_xodo) OVER (), 0)::numeric, 0)
+           ), 1)                       AS indice_engajamento
+      FROM base
 )
-SELECT rank() OVER (ORDER BY COALESCE(pt.pontos, 0) DESC) AS posicao,
-       i.nome                          AS residente,
-       pv.nome                         AS xodo,
-       COALESCE(pt.pontos, 0)          AS pontos_xodo_30d,
-       COALESCE(l.atividades, 0)       AS atividades_30d,
-       COALESCE(c.checkins, 0)         AS checkins_30d
-  FROM idoso i
-  LEFT JOIN pet_virtual pv ON pv.id_idoso = i.id_idoso
-  LEFT JOIN pontos   pt ON pt.id_idoso = i.id_idoso
-  LEFT JOIN lazer    l  ON l.id_idoso  = i.id_idoso
-  LEFT JOIN checkins c  ON c.id_idoso  = i.id_idoso
- WHERE i.ativo
+SELECT rank() OVER (ORDER BY indice_engajamento DESC) AS posicao,
+       residente,
+       xodo,
+       indice_engajamento,
+       LEAST(4, 1 + floor(4 * percent_rank() OVER (ORDER BY indice_engajamento)))::int AS quartil,
+       checkins,
+       atividades,
+       pontos_xodo
+  FROM indice
  ORDER BY posicao, residente`,
+  },
+  {
+    id: 9,
+    titulo: "Isolamento: quem não joga dominó com outro idoso",
+    pergunta: "Quem não sentou à mesa com nenhum colega no período — e com quem costumava jogar?",
+    tecnicas: ["CTE com UNION ALL", "NOT EXISTS", "auto-junção (idoso × idoso)", "DISTINCT ON", "parâmetro $1"],
+    periodo: { padrao: 14, opcoes: [7, 14, 30] },
+    grafico: { tipo: "barras", x: "residente", y: ["dias_sem_jogar_a_dois"], sem_nulos: true,
+               rotulo: "Dias desde a última partida com um colega (quem nunca jogou a dois está só na tabela)", alerta: 21 },
+    // "duplas" vê cada partida entre dois idosos pelos dois lados, para que
+    // jogador1 e jogador2 sejam tratados igualmente. O parceiro mais frequente
+    // vem da junção de idoso com ele mesmo (o residente e o colega de mesa).
+    // Primeiro vem quem tinha o hábito e parou (o sinal mais forte de
+    // isolamento); depois, quem nunca jogou com um colega.
+    sql: `WITH duplas AS (
+    SELECT id_jogador1 AS id_idoso, id_jogador2 AS id_parceiro, data_hora
+      FROM partida_domino WHERE id_jogador2 IS NOT NULL
+    UNION ALL
+    SELECT id_jogador2, id_jogador1, data_hora
+      FROM partida_domino WHERE id_jogador2 IS NOT NULL
+), parceiro_frequente AS (
+    SELECT DISTINCT ON (eu.id_idoso)
+           eu.id_idoso, colega.nome AS parceiro, count(*) AS partidas_juntos
+      FROM duplas d
+      JOIN idoso eu     ON eu.id_idoso     = d.id_idoso
+      JOIN idoso colega ON colega.id_idoso = d.id_parceiro
+     GROUP BY eu.id_idoso, colega.id_idoso, colega.nome
+     ORDER BY eu.id_idoso, count(*) DESC, colega.nome
+)
+SELECT i.nome                          AS residente,
+       CASE WHEN max(d.data_hora) IS NULL THEN 'nunca jogou a dois'
+            ELSE 'parou de jogar a dois' END AS situacao,
+       to_char(max(d.data_hora), 'DD/MM/YYYY') AS ultima_partida_a_dois,
+       CURRENT_DATE - max(d.data_hora)::date  AS dias_sem_jogar_a_dois,
+       pf.parceiro                     AS parceiro_mais_frequente,
+       pf.partidas_juntos
+  FROM idoso i
+  LEFT JOIN duplas d              ON d.id_idoso  = i.id_idoso
+  LEFT JOIN parceiro_frequente pf ON pf.id_idoso = i.id_idoso
+ WHERE i.ativo
+   AND NOT EXISTS (SELECT 1 FROM duplas recente
+                    WHERE recente.id_idoso = i.id_idoso
+                      AND recente.data_hora >= now() - make_interval(days => $1::int))
+ GROUP BY i.id_idoso, i.nome, pf.parceiro, pf.partidas_juntos
+ ORDER BY dias_sem_jogar_a_dois DESC NULLS LAST, residente`,
+  },
+  {
+    id: 10,
+    titulo: "Quedas recorrentes",
+    pergunta: "Quem caiu duas vezes ou mais — e o plano de cuidado já trata da mobilidade?",
+    tecnicas: ["INNER JOIN", "GROUP BY + HAVING", "subconsulta escalar", "EXISTS", "CASE", "parâmetro $1"],
+    periodo: { padrao: 90, opcoes: [30, 90, 180] },
+    grafico: { tipo: "barras", x: "residente", y: ["quedas"], rotulo: "Quedas no período", alerta: 3 },
+    sql: `SELECT i.nome                          AS residente,
+       'Grau ' || i.grau_dependencia   AS grau_dependencia,
+       count(*)                        AS quedas,
+       count(*) FILTER (WHERE ic.gravidade <> 'leve') AS moderadas_ou_graves,
+       to_char(max(ic.data_hora), 'DD/MM/YYYY')       AS ultima_queda,
+       string_agg(DISTINCT ic.local_evento, ', ')     AS locais,
+       round(100.0 * count(*) / (SELECT count(*)
+                                   FROM intercorrencia q
+                                  WHERE q.tipo = 'queda'
+                                    AND q.data_hora >= now() - make_interval(days => $1::int)), 1)
+                                       AS pct_das_quedas_da_casa,
+       CASE WHEN EXISTS (SELECT 1 FROM meta_cuidado m
+                          WHERE m.id_idoso = i.id_idoso
+                            AND m.categoria = 'mobilidade'
+                            AND m.status = 'ativa')
+            THEN 'sim' ELSE 'NÃO — revisar plano' END AS meta_de_mobilidade_ativa
+  FROM intercorrencia ic
+  JOIN idoso i ON i.id_idoso = ic.id_idoso
+ WHERE ic.tipo = 'queda'
+   AND ic.data_hora >= now() - make_interval(days => $1::int)
+   AND i.ativo
+ GROUP BY i.id_idoso, i.nome, i.grau_dependencia
+HAVING count(*) >= 2
+ ORDER BY quedas DESC, residente`,
   },
 ];

@@ -35,7 +35,7 @@ psql -U postgres -d NOME_DO_BANCO -f etapa02/etapa02_insercao_dados.sql
 
 **Aplicação:** `aplicacao_bemviver_ilpi.zip` traz o projeto inteiro. Se o professor preferir o GitHub, envie um .txt com o link do repositório. Para rodar: siga a seção "Instalação" do `README.md` dentro do zip.
 
-**SQL das consultas:** `etapa03_consultas.sql` — 8 consultas (o mínimo é 4), 6 com JOIN, incluindo CTEs, funções de janela (RANK e SUM OVER), LEFT JOIN com generate_series, COUNT … FILTER e CROSS JOIN LATERAL unnest.
+**SQL das consultas:** `etapa03_consultas.sql` — 10 consultas (o mínimo é 4), 9 com JOIN, incluindo CTEs, funções de janela (RANK, PERCENT_RANK, LAG e SUM OVER), LEFT JOIN com generate_series, auto-junção, UNION ALL, NOT EXISTS, subconsulta escalar, COUNT … FILTER e CROSS JOIN LATERAL unnest. Oito delas recebem o período em dias como parâmetro (`$1`): na tela, o gestor escolhe 7, 30 ou 90 dias; no arquivo .sql, cada uma aparece como `PREPARE` + `EXECUTE` com o período padrão.
 
 **Interface**
 
@@ -43,12 +43,12 @@ psql -U postgres -d NOME_DO_BANCO -f etapa02/etapa02_insercao_dados.sql
 |---|---|
 | Inserir, remover e atualizar em pelo menos 2 tabelas | **recado_mural**: entrar como `mariana.filha@email.com` → cartão da Dona Severina → enviar, ✏️ editar e 🗑️ apagar recado. **restricao_alimentar**: entrar como `enf.patricia@larpaz.com` → 🍎 Nutrição de um residente → adicionar, ✏️ renomear e × remover |
 | Visualização de dados com gráficos e resultado das consultas | entrar como `gestor@larpaz.com` → aba **📊 Consultas**: cada consulta mostra gráfico (barras ou linhas), tabela do resultado, botão "Ver o SQL" e "Baixar CSV" |
-| Pelo menos 4 consultas, 1 com JOIN | as 8 da aba 📊 Consultas |
+| Pelo menos 4 consultas, 1 com JOIN | as 10 da aba 📊 Consultas (com seletor de período) |
 
 **Backend: linguagem de programação integrada ao SGBD, com SQL explícito**
 
 - Linguagem: **JavaScript (Node.js)** com o driver oficial do PostgreSQL, **`pg` (node-postgres)** — o equivalente do JDBC no Node. Não há ORM.
-- Todo comando SQL está escrito por extenso no código: `api/server.js` (cerca de 95 chamadas `query(...)` com INSERT, SELECT, UPDATE e DELETE) e `api/consultas.js` (as 8 consultas).
+- Todo comando SQL está escrito por extenso no código: `api/server.js` (cerca de 95 chamadas `query(...)` com INSERT, SELECT, UPDATE e DELETE) e `api/consultas.js` (as 10 consultas).
 - Parâmetros sempre passados separados do SQL (`$1, $2…`), o que impede injeção de SQL — o mesmo papel do `PreparedStatement` no JDBC.
 - Transações explícitas: cada requisição roda entre `BEGIN` e `COMMIT` (ou `ROLLBACK` em erro), com a identidade do usuário passada ao banco (`set_config('app.id_usuario', …)`). As permissões são aplicadas pelo próprio PostgreSQL (Row-Level Security em todas as 30 tabelas).
 

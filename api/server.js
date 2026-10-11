@@ -1615,20 +1615,30 @@ app.get("/alertas/checkins", autenticar, async (req, res) => {
 // então o RLS limita o resultado à ILPI de quem pediu.
 // ============================================================
 app.get("/consultas", autenticar, (req, res) => {
-  res.json(CONSULTAS.map(({ id, titulo, pergunta, tecnicas, grafico }) => ({ id, titulo, pergunta, tecnicas, grafico })));
+  res.json(CONSULTAS.map(({ id, titulo, pergunta, tecnicas, grafico, periodo }) =>
+    ({ id, titulo, pergunta, tecnicas, grafico, periodo: periodo || null })));
 });
 
 app.get("/consultas/:id", autenticar, async (req, res) => {
   const def = CONSULTAS.find((c) => c.id === Number(req.params.id));
   if (!def) return res.status(404).json({ erro: "Consulta não encontrada." });
+  // período em dias ($1): só os valores oferecidos pela consulta; sem ?dias, o padrão
+  let params = [];
+  if (def.periodo) {
+    const dias = req.query.dias === undefined ? def.periodo.padrao : Number(req.query.dias);
+    if (!def.periodo.opcoes.includes(dias))
+      return res.status(400).json({ erro: `Período inválido. Use ${def.periodo.opcoes.join(", ")} dias.` });
+    params = [dias];
+  }
   try {
     const r = await comUsuario(req.usuario.id_usuario, async (c) => {
       const { rows } = await c.query("SELECT fn_sou_gestor() AS ok");
       if (!rows[0].ok) throw Object.assign(new Error("As consultas analíticas são do gestor da ILPI."), { status: 403 });
-      return c.query(def.sql);
+      return c.query(def.sql, params);   // SQL explícito; o período vai como parâmetro $1
     });
     res.json({
       id: def.id, titulo: def.titulo, sql: def.sql, grafico: def.grafico,
+      periodo: def.periodo ? { ...def.periodo, dias: params[0] } : null,
       colunas: r.fields.map((f) => f.name), linhas: r.rows,
     });
   } catch (e) {

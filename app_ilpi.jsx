@@ -2110,8 +2110,13 @@ function GraficoBarrasH({ linhas, x, y, max, alerta, alerta_abaixo, rotulo }) {
 
 function GraficoLinhas({ linhas, x, ys, rotulo }) {
   const W = 320, H = 170, esq = 28, dir = 20, topo = 10, base = 28;
-  const series = ys.map((c) => linhas.map((l) => num(l[c]) ?? 0));
-  const maxV = Math.ceil(Math.max(1, ...series.flat()));
+  // null = semana sem registro: a linha é interrompida ali, em vez de despencar para zero
+  const series = ys.map((c) => linhas.map((l) => num(l[c])));
+  const maxV = Math.ceil(Math.max(1, ...series.flat().filter((v) => v !== null)));
+  const trechos = (vs) => vs.reduce((acc, v, k) => {
+    if (v === null) acc.push([]); else acc[acc.length - 1].push(`${px(k)},${py(v)}`);
+    return acc;
+  }, [[]]).filter((t) => t.length);
   const px = (k) => esq + (linhas.length === 1 ? (W - esq - dir) / 2 : (k * (W - esq - dir)) / (linhas.length - 1));
   const py = (v) => topo + (H - topo - base) * (1 - v / maxV);
   const estilos = [{ cor: CORES.anil, traco: "" }, { cor: CORES.alerta, traco: "6 4" }, { cor: CORES.verde, traco: "2 3" }];
@@ -2128,9 +2133,10 @@ function GraficoLinhas({ linhas, x, ys, rotulo }) {
         {linhas.map((l, k) => <text key={k} x={px(k)} y={H - 10} fontSize="10" textAnchor="middle" fill={CORES.nota}>{l[x]}</text>)}
         {series.map((vs, si) => (
           <g key={si}>
-            <polyline fill="none" stroke={estilos[si].cor} strokeWidth="2.5" strokeDasharray={estilos[si].traco}
-              points={vs.map((v, k) => `${px(k)},${py(v)}`).join(" ")} />
-            {vs.map((v, k) => <circle key={k} cx={px(k)} cy={py(v)} r="3.5" fill={estilos[si].cor}><title>{`${ROTULO_COL(ys[si])}: ${v}`}</title></circle>)}
+            {trechos(vs).map((t, ti) => (
+              <polyline key={ti} fill="none" stroke={estilos[si].cor} strokeWidth="2.5" strokeDasharray={estilos[si].traco} points={t.join(" ")} />
+            ))}
+            {vs.map((v, k) => v === null ? null : <circle key={k} cx={px(k)} cy={py(v)} r="3.5" fill={estilos[si].cor}><title>{`${ROTULO_COL(ys[si])}: ${v}`}</title></circle>)}
           </g>
         ))}
       </svg>
@@ -2167,9 +2173,9 @@ function PainelConsultas({ token, demo }) {
     api("/consultas", { token }).then(setLista).catch((e) => { setErro(e.message); setLista([]); });
   }, []); // eslint-disable-line
 
-  async function abrir(c) {
+  async function abrir(c, dias) {
     setErro(""); setVerSql(false); setCarregando(c.id);
-    try { setRes(await api(`/consultas/${c.id}`, { token })); }
+    try { setRes(await api(`/consultas/${c.id}${dias ? `?dias=${dias}` : ""}`, { token })); }
     catch (e) { setErro(`Não consegui rodar a consulta (${e.message}).`); setRes(null); }
     finally { setCarregando(null); }
   }
@@ -2203,12 +2209,24 @@ function PainelConsultas({ token, demo }) {
       {res && (
         <Cartao>
           <h3 style={{ fontSize: 19, margin: "0 0 10px" }}>{res.titulo}</h3>
+          {res.periodo && (
+            <div role="group" aria-label="Período da consulta" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+              <span style={{ fontSize: 15, color: CORES.nota }}>Últimos</span>
+              {res.periodo.opcoes.map((d) => (
+                <button key={d} onClick={() => abrir(res, d)} aria-pressed={res.periodo.dias === d} style={{
+                  fontSize: 15, fontWeight: 700, padding: "6px 12px", borderRadius: 10, minHeight: 40, cursor: "pointer",
+                  border: `2px solid ${CORES.anil}`, background: res.periodo.dias === d ? CORES.anil : CORES.cartao,
+                  color: res.periodo.dias === d ? "#fff" : CORES.anil, fontFamily: "'Atkinson Hyperlegible', sans-serif",
+                }}>{d} dias</button>
+              ))}
+            </div>
+          )}
           {res.linhas.length === 0 ? (
             <p style={{ fontSize: 16 }}>Nenhuma linha retornada — nada a alertar por aqui.</p>
           ) : g.tipo === "linhas" ? (
             <GraficoLinhas linhas={res.linhas} x={g.x} ys={g.y} rotulo={g.rotulo} />
           ) : (
-            <GraficoBarrasH linhas={res.linhas.slice(0, 15)} x={g.x} y={g.y[0]} max={g.max} alerta={g.alerta} alerta_abaixo={g.alerta_abaixo}
+            <GraficoBarrasH linhas={(g.sem_nulos ? res.linhas.filter((l) => l[g.y[0]] !== null) : res.linhas).slice(0, 15)} x={g.x} y={g.y[0]} max={g.max} alerta={g.alerta} alerta_abaixo={g.alerta_abaixo}
               rotulo={g.rotulo + (res.linhas.length > 15 ? ` — 15 primeiros de ${res.linhas.length}` : "")} />
           )}
 

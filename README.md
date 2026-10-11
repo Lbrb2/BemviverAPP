@@ -39,7 +39,7 @@ schema_ilpi.sql                  Schema canônico completo (tabelas, constraints
 seed_ilpi.sql                    Dados de exemplo: ≥ 30 tuplas em cada tabela (30 ILPIs,
                                  32 idosos, 30 profissionais...), contas demo preservadas
 consultas_ilpi.sql               8 consultas analíticas e de alerta (versão original)
-consultas_etapa03.sql            As 8 consultas da tela "📊 Consultas" (gerado de api/consultas.js)
+consultas_etapa03.sql            As 10 consultas da tela "📊 Consultas" (gerado de api/consultas.js)
 demonstracao_acoes_referenciais.sql  Mostra ON UPDATE CASCADE e ON DELETE SET NULL (com ROLLBACK)
 entregas_bd/                     Entregas da disciplina de Banco de Dados (Etapas 01, 02 e 03)
 rls_ilpi.sql                     Papel app_user, funções auxiliares e políticas de RLS

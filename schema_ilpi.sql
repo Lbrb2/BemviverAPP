@@ -263,7 +263,11 @@ CREATE TABLE prescricao (
     fim             DATE,                           -- NULL = uso contínuo
     ativo           BOOLEAN NOT NULL DEFAULT TRUE,
     CONSTRAINT ck_periodo CHECK (fim IS NULL OR fim >= inicio),
-    CONSTRAINT ck_tem_horario CHECK (array_length(horarios, 1) >= 1)
+    CONSTRAINT ck_tem_horario CHECK (array_length(horarios, 1) >= 1),
+    -- suspender uma prescrição = registrar a data de fim: assim o histórico
+    -- (ex.: consulta de adesão de semanas passadas) continua sabendo até
+    -- quando as doses eram devidas
+    CONSTRAINT ck_inativa_tem_fim CHECK (ativo OR fim IS NOT NULL)
 );
 
 CREATE TABLE administracao_medicacao (
