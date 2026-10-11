@@ -33,41 +33,62 @@ ALTER VIEW vw_painel_idoso SET (security_invoker = true);
 -- SECURITY DEFINER: executam com privilégios do dono (bypass de RLS
 -- interno) para evitar recursão de políticas; STABLE para o planner
 -- poder cachear o resultado dentro da mesma consulta.
+-- SET search_path = public, pg_temp: como rodam com o poder do dono, o
+-- caminho de busca fica fixo — ninguém consegue "trocar" uma tabela ou
+-- função por um objeto temporário de mesmo nome (pg_temp vai por último).
 
 CREATE OR REPLACE FUNCTION fn_usuario_atual() RETURNS int
 LANGUAGE sql STABLE AS
 $$ SELECT NULLIF(current_setting('app.id_usuario', true), '')::int $$;
 
 CREATE OR REPLACE FUNCTION fn_meu_id_profissional() RETURNS int
-LANGUAGE sql STABLE SECURITY DEFINER AS
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS
 $$ SELECT id_profissional FROM profissional WHERE id_usuario = fn_usuario_atual() $$;
 
 CREATE OR REPLACE FUNCTION fn_minha_ilpi_profissional() RETURNS int
-LANGUAGE sql STABLE SECURITY DEFINER AS
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS
 $$ SELECT id_ilpi FROM profissional WHERE id_usuario = fn_usuario_atual() $$;
 
 CREATE OR REPLACE FUNCTION fn_sou_psicologo() RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER AS
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS
 $$ SELECT EXISTS (SELECT 1 FROM profissional
                    WHERE id_usuario = fn_usuario_atual()
                      AND funcao = 'psicologo') $$;
 
 -- Idosos vinculados a mim como responsável
 CREATE OR REPLACE FUNCTION fn_idosos_sob_minha_responsabilidade() RETURNS SETOF int
-LANGUAGE sql STABLE SECURITY DEFINER AS
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS
 $$ SELECT v.id_idoso
      FROM vinculo_responsavel v
      JOIN responsavel r USING (id_responsavel)
     WHERE r.id_usuario = fn_usuario_atual() $$;
 
+-- Destes, os que têm consentimento LGPD VIGENTE para dados de saúde.
+-- Usada nas tabelas clínicas (bem-estar, sinais, medicação, avaliações,
+-- plano de cuidado, intercorrências, nutrição): se o consentimento for
+-- revogado, a família continua vendo o cadastro, o Xodó, o mural, as
+-- atividades e o próprio consentimento (para poder concedê-lo de novo),
+-- mas não o prontuário. A equipe da ILPI não depende dele: o cuidado é
+-- tutela da saúde (LGPD, art. 11, II, f).
+CREATE OR REPLACE FUNCTION fn_idosos_com_consentimento_saude() RETURNS SETOF int
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS
+$$ SELECT v.id_idoso
+     FROM vinculo_responsavel v
+     JOIN responsavel r USING (id_responsavel)
+    WHERE r.id_usuario = fn_usuario_atual()
+      AND EXISTS (SELECT 1 FROM consentimento_lgpd c
+                   WHERE c.id_idoso = v.id_idoso
+                     AND c.categoria = 'dados_saude'
+                     AND c.data_revogacao IS NULL) $$;
+
 -- Meu próprio cadastro de idoso (se eu for um idoso com acesso ao app)
 CREATE OR REPLACE FUNCTION fn_meu_id_idoso() RETURNS int
-LANGUAGE sql STABLE SECURITY DEFINER AS
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS
 $$ SELECT id_idoso FROM idoso WHERE id_usuario = fn_usuario_atual() $$;
 
 -- ILPI de um idoso (usada nas políticas das tabelas de registro)
 CREATE OR REPLACE FUNCTION fn_ilpi_do_idoso(p_id_idoso int) RETURNS int
-LANGUAGE sql STABLE SECURITY DEFINER AS
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS
 $$ SELECT id_ilpi FROM idoso WHERE id_idoso = p_id_idoso $$;
 
 -- ============================================================
@@ -96,7 +117,7 @@ ALTER TABLE registro_bem_estar FORCE ROW LEVEL SECURITY;
 CREATE POLICY sel_bem_estar ON registro_bem_estar FOR SELECT TO app_user
     USING (
         fn_ilpi_do_idoso(id_idoso) = fn_minha_ilpi_profissional()
-        OR id_idoso IN (SELECT fn_idosos_sob_minha_responsabilidade())
+        OR id_idoso IN (SELECT fn_idosos_com_consentimento_saude())
         OR id_idoso = fn_meu_id_idoso()
     );
 
@@ -118,7 +139,7 @@ ALTER TABLE registro_saude FORCE ROW LEVEL SECURITY;
 CREATE POLICY sel_saude ON registro_saude FOR SELECT TO app_user
     USING (
         fn_ilpi_do_idoso(id_idoso) = fn_minha_ilpi_profissional()
-        OR id_idoso IN (SELECT fn_idosos_sob_minha_responsabilidade())
+        OR id_idoso IN (SELECT fn_idosos_com_consentimento_saude())
         OR id_idoso = fn_meu_id_idoso()
     );
 
@@ -135,7 +156,7 @@ ALTER TABLE avaliacao FORCE ROW LEVEL SECURITY;
 CREATE POLICY sel_avaliacao ON avaliacao FOR SELECT TO app_user
     USING (
         fn_ilpi_do_idoso(id_idoso) = fn_minha_ilpi_profissional()
-        OR id_idoso IN (SELECT fn_idosos_sob_minha_responsabilidade())
+        OR id_idoso IN (SELECT fn_idosos_com_consentimento_saude())
         OR id_idoso = fn_meu_id_idoso()
     );
 
@@ -168,11 +189,11 @@ CREATE POLICY ins_psico ON atendimento_psicologico FOR INSERT TO app_user
 
 -- ---------- Medicação, Mural e Auditoria ----------
 CREATE OR REPLACE FUNCTION fn_minha_funcao() RETURNS funcao_profissional
-LANGUAGE sql STABLE SECURITY DEFINER AS
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS
 $$ SELECT funcao FROM profissional WHERE id_usuario = fn_usuario_atual() $$;
 
 CREATE OR REPLACE FUNCTION fn_meu_id_responsavel() RETURNS int
-LANGUAGE sql STABLE SECURITY DEFINER AS
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS
 $$ SELECT id_responsavel FROM responsavel WHERE id_usuario = fn_usuario_atual() $$;
 
 ALTER TABLE prescricao ENABLE ROW LEVEL SECURITY;
@@ -183,7 +204,7 @@ ALTER TABLE administracao_medicacao FORCE ROW LEVEL SECURITY;
 CREATE POLICY sel_prescricao ON prescricao FOR SELECT TO app_user
     USING (
         fn_ilpi_do_idoso(id_idoso) = fn_minha_ilpi_profissional()
-        OR id_idoso IN (SELECT fn_idosos_sob_minha_responsabilidade())
+        OR id_idoso IN (SELECT fn_idosos_com_consentimento_saude())
         OR id_idoso = fn_meu_id_idoso()
     );
 
@@ -228,7 +249,7 @@ CREATE POLICY ins_recado ON recado_mural FOR INSERT TO app_user
 -- A trilha deixa de depender da API: qualquer escrita nas tabelas
 -- sensíveis é registrada pelo próprio banco, seja qual for o caminho.
 CREATE OR REPLACE FUNCTION fn_trigger_auditoria() RETURNS trigger
-LANGUAGE plpgsql SECURITY DEFINER AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
     uid int := NULLIF(current_setting('app.id_usuario', true), '')::int;
 BEGIN
@@ -269,7 +290,7 @@ GRANT USAGE ON SEQUENCE prescricao_id_prescricao_seq, administracao_medicacao_id
 
 -- ---------- Consentimento LGPD ----------
 CREATE OR REPLACE FUNCTION fn_sou_responsavel_legal(p_id_idoso int) RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER AS
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS
 $$ SELECT EXISTS (
      SELECT 1 FROM vinculo_responsavel v
      JOIN responsavel r USING (id_responsavel)
@@ -301,7 +322,7 @@ CREATE TRIGGER trg_aud_consentimento AFTER INSERT OR UPDATE OR DELETE ON consent
 
 -- ---------- Gestor da ILPI ----------
 CREATE OR REPLACE FUNCTION fn_sou_gestor() RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER AS
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS
 $$ SELECT EXISTS (SELECT 1 FROM profissional
                    WHERE id_usuario = fn_usuario_atual() AND funcao = 'gestor') $$;
 
@@ -436,7 +457,7 @@ ALTER TABLE sinal_vital FORCE ROW LEVEL SECURITY;
 CREATE POLICY sel_sinal ON sinal_vital FOR SELECT TO app_user
     USING (
         fn_ilpi_do_idoso(id_idoso) = fn_minha_ilpi_profissional()
-        OR id_idoso IN (SELECT fn_idosos_sob_minha_responsabilidade())
+        OR id_idoso IN (SELECT fn_idosos_com_consentimento_saude())
         OR id_idoso = fn_meu_id_idoso()
     );
 
@@ -463,7 +484,7 @@ ALTER TABLE evolucao_meta FORCE ROW LEVEL SECURITY;
 CREATE POLICY sel_meta ON meta_cuidado FOR SELECT TO app_user
     USING (
         fn_ilpi_do_idoso(id_idoso) = fn_minha_ilpi_profissional()
-        OR id_idoso IN (SELECT fn_idosos_sob_minha_responsabilidade())
+        OR id_idoso IN (SELECT fn_idosos_com_consentimento_saude())
         OR id_idoso = fn_meu_id_idoso()
     );
 CREATE POLICY ins_meta ON meta_cuidado FOR INSERT TO app_user
@@ -476,7 +497,7 @@ CREATE POLICY upd_meta ON meta_cuidado FOR UPDATE TO app_user
 CREATE POLICY sel_evol_meta ON evolucao_meta FOR SELECT TO app_user
     USING (EXISTS (SELECT 1 FROM meta_cuidado m WHERE m.id_meta = evolucao_meta.id_meta
                     AND (fn_ilpi_do_idoso(m.id_idoso) = fn_minha_ilpi_profissional()
-                         OR m.id_idoso IN (SELECT fn_idosos_sob_minha_responsabilidade())
+                         OR m.id_idoso IN (SELECT fn_idosos_com_consentimento_saude())
                          OR m.id_idoso = fn_meu_id_idoso())));
 CREATE POLICY ins_evol_meta ON evolucao_meta FOR INSERT TO app_user
     WITH CHECK (id_profissional = fn_meu_id_profissional()
@@ -505,7 +526,7 @@ END $$;
 -- SELECT: equipe da ILPI, responsável do idoso, ou o próprio idoso
 CREATE POLICY sel_interc ON intercorrencia FOR SELECT TO app_user
     USING (fn_ilpi_do_idoso(id_idoso) = fn_minha_ilpi_profissional()
-        OR id_idoso IN (SELECT fn_idosos_sob_minha_responsabilidade())
+        OR id_idoso IN (SELECT fn_idosos_com_consentimento_saude())
         OR id_idoso = fn_meu_id_idoso());
 CREATE POLICY ins_interc ON intercorrencia FOR INSERT TO app_user
     WITH CHECK (id_profissional = fn_meu_id_profissional()
@@ -513,7 +534,7 @@ CREATE POLICY ins_interc ON intercorrencia FOR INSERT TO app_user
 
 CREATE POLICY sel_restr ON restricao_alimentar FOR SELECT TO app_user
     USING (fn_ilpi_do_idoso(id_idoso) = fn_minha_ilpi_profissional()
-        OR id_idoso IN (SELECT fn_idosos_sob_minha_responsabilidade())
+        OR id_idoso IN (SELECT fn_idosos_com_consentimento_saude())
         OR id_idoso = fn_meu_id_idoso());
 CREATE POLICY ins_restr ON restricao_alimentar FOR INSERT TO app_user
     WITH CHECK (fn_ilpi_do_idoso(id_idoso) = fn_minha_ilpi_profissional());
@@ -522,7 +543,7 @@ CREATE POLICY del_restr ON restricao_alimentar FOR DELETE TO app_user
 
 CREATE POLICY sel_refeicao ON registro_refeicao FOR SELECT TO app_user
     USING (fn_ilpi_do_idoso(id_idoso) = fn_minha_ilpi_profissional()
-        OR id_idoso IN (SELECT fn_idosos_sob_minha_responsabilidade())
+        OR id_idoso IN (SELECT fn_idosos_com_consentimento_saude())
         OR id_idoso = fn_meu_id_idoso());
 CREATE POLICY ins_refeicao ON registro_refeicao FOR INSERT TO app_user
     WITH CHECK (id_profissional = fn_meu_id_profissional()
@@ -567,12 +588,13 @@ CREATE TRIGGER trg_aud_restricao AFTER INSERT OR UPDATE OR DELETE ON restricao_a
 -- Como só o dono pode alterar o próprio pet (upd_pet_dono), os pontos
 -- de check-ins feitos pela equipe e do adversário no dominó se perdiam
 -- em silêncio — e o nível nunca subia. Agora tudo passa por esta função:
--- ela confere quem pode pontuar, grava o evento e atualiza pontos e
--- nível (1 nível a cada 100 pontos) na mesma transação.
+-- ela confere quem pode pontuar, grava o evento e soma os pontos na
+-- mesma transação. O nível (1 a cada 100 pontos) é coluna gerada em
+-- pet_virtual: acompanha os pontos sozinho.
 -- ============================================================
 CREATE OR REPLACE FUNCTION fn_pontuar_pet(p_id_idoso int, p_origem origem_evento_pet, p_pontos int)
 RETURNS TABLE (pet text, pontos int, nivel int, subiu_nivel boolean)
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
     v_pet   pet_virtual%ROWTYPE;
     v_ilpi  int := fn_ilpi_do_idoso(p_id_idoso);
@@ -599,15 +621,15 @@ BEGIN
     IF NOT FOUND THEN RETURN; END IF;   -- idoso sem pet: nada a fazer
 
     INSERT INTO evento_pet (id_pet, origem, pontos_ganhos) VALUES (v_pet.id_pet, p_origem, p_pontos);
-    v_nivel := GREATEST(v_pet.nivel, 1 + (v_pet.pontos + p_pontos) / 100);
-    UPDATE pet_virtual SET pontos = v_pet.pontos + p_pontos, nivel = v_nivel WHERE id_pet = v_pet.id_pet;
+    UPDATE pet_virtual SET pontos = v_pet.pontos + p_pontos WHERE id_pet = v_pet.id_pet
+    RETURNING pet_virtual.nivel INTO v_nivel;            -- recalculado pela coluna gerada
 
     RETURN QUERY SELECT v_pet.nome::text, v_pet.pontos + p_pontos, v_nivel, v_nivel > v_pet.nivel;
 END $$;
 REVOKE ALL ON FUNCTION fn_pontuar_pet(int, origem_evento_pet, int) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION fn_pontuar_pet(int, origem_evento_pet, int) TO app_user;
 
--- pontos e nível só mudam pela função; o dono personaliza nome, espécie, acessório e cor
+-- pontos só mudam pela função (e o nível vem deles); o dono personaliza nome, espécie, acessório e cor
 REVOKE UPDATE ON pet_virtual FROM app_user;
 GRANT UPDATE (nome, especie, acessorio, cor) ON pet_virtual TO app_user;
 
@@ -618,7 +640,7 @@ GRANT UPDATE (nome, especie, acessorio, cor) ON pet_virtual TO app_user;
 -- ILPIs que eu enxergo: a minha (equipe), a do meu cadastro (idoso)
 -- e as dos idosos que acompanho (responsável)
 CREATE OR REPLACE FUNCTION fn_ilpis_visiveis() RETURNS SETOF int
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
     SELECT fn_minha_ilpi_profissional() WHERE fn_minha_ilpi_profissional() IS NOT NULL
     UNION
     SELECT fn_ilpi_do_idoso(fn_meu_id_idoso()) WHERE fn_meu_id_idoso() IS NOT NULL
@@ -630,7 +652,7 @@ $$;
 -- pessoas da ILPI dele (e contas recém-criadas, ainda sem dono, para o
 -- INSERT ... RETURNING do cadastro funcionar)
 CREATE OR REPLACE FUNCTION fn_usuario_visivel(p_id_usuario int) RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
     SELECT p_id_usuario = fn_usuario_atual()
         OR (fn_sou_gestor() AND (
                EXISTS (SELECT 1 FROM idoso i WHERE i.id_usuario = p_id_usuario
@@ -648,7 +670,7 @@ $$;
 -- Responsável visível: ligado a um idoso que eu enxergo (equipe, o próprio
 -- idoso ou outro familiar do mesmo idoso); ou recém-cadastrado pelo gestor
 CREATE OR REPLACE FUNCTION fn_responsavel_visivel(p_id_responsavel int) RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
     SELECT EXISTS (
         SELECT 1 FROM vinculo_responsavel v
          WHERE v.id_responsavel = p_id_responsavel
@@ -767,6 +789,19 @@ CREATE POLICY sel_auditoria ON log_auditoria FOR SELECT TO app_user
     USING (id_usuario = fn_usuario_atual() OR (fn_sou_gestor() AND fn_usuario_visivel(id_usuario)));
 REVOKE INSERT, UPDATE ON log_auditoria FROM app_user;
 
+-- ---------- Conferência ----------
+-- Nenhuma função SECURITY DEFINER pode ficar sem search_path fixo.
+DO $$
+DECLARE v_faltando text;
+BEGIN
+    SELECT string_agg(p.proname, ', ') INTO v_faltando
+      FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public' AND p.prosecdef
+       AND NOT EXISTS (SELECT 1 FROM unnest(p.proconfig) c WHERE c LIKE 'search_path=%');
+    IF v_faltando IS NOT NULL THEN
+        RAISE EXCEPTION 'Funções SECURITY DEFINER sem search_path: %', v_faltando;
+    END IF;
+END $$;
 
 COMMIT;
 
@@ -790,5 +825,14 @@ COMMIT;
 -- 4) Como a enfermeira da OUTRA ILPI (usuária 9, Caruaru):
 --    SET app.id_usuario = '9';
 --    SELECT nome FROM idoso;                        -- esperado: só os 8 de Caruaru
+--
+-- 5) Consentimento LGPD (como a responsável legal Mariana, usuário 3):
+--    BEGIN; SET ROLE app_user; SET app.id_usuario = '3';
+--    SELECT count(*) FROM registro_bem_estar;       -- os check-ins da Dona Severina
+--    UPDATE consentimento_lgpd SET data_revogacao = now()
+--     WHERE id_idoso = 1 AND categoria = 'dados_saude' AND data_revogacao IS NULL;
+--    SELECT count(*) FROM registro_bem_estar;       -- esperado: 0 (prontuário oculto)
+--    SELECT nome FROM idoso;                        -- continua: 1 linha
+--    ROLLBACK;                                      -- desfaz a revogação
 --
 -- RESET ROLE;  -- volta ao papel administrador

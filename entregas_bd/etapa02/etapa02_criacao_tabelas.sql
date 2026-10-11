@@ -4,9 +4,13 @@
 -- Ordem de execução: 1) este arquivo  2) etapa02_insercao_dados.sql
 --
 -- Onde estão os requisitos pedidos:
---  * CHECK ............ 34 ocorrências (faixas de humor/dor, sinais vitais, idade >= 60...)
+--  * CHECK ............ 41 ocorrências (faixas de humor/dor, sinais vitais, idade >= 60...)
 --  * DEFAULT .......... 35 ocorrências (now(), CURRENT_DATE, TRUE, 'PE', 'rotina'...)
---  * UNIQUE ........... 10 ocorrências (cpf, cnpj, e-mail, dose única por horário...)
+--  * UNIQUE ........... 13 ocorrências (cpf, cnpj, e-mail, dose única por horário...)
+--  * CHECK com função . CPF e CNPJ conferidos pelos dígitos verificadores
+--                       (fn_cpf_valido / fn_cnpj_valido, IMMUTABLE); e-mail, telefone e UF
+--  * Coluna gerada .... pet_virtual.nivel = 1 + pontos / 100
+--  * Índices .......... em todas as chaves estrangeiras (ix_fk_*)
 --  * ON UPDATE CASCADE  vinculo_responsavel e participacao
 --  * ON DELETE SET NULL idoso.id_usuario, registro_bem_estar.id_profissional,
 --                       recado_plantao.id_idoso
@@ -40,6 +44,37 @@ CREATE TYPE categoria_meta AS ENUM ('saude', 'mobilidade', 'nutricao', 'social',
 CREATE TYPE turno_plantao AS ENUM ('manha', 'tarde', 'noite');
 CREATE TYPE prioridade_plantao AS ENUM ('rotina', 'atencao', 'urgente');
 
+-- ---------- Validação de documentos (usadas nos CHECK de ilpi e idoso) ----------
+-- IMMUTABLE: o resultado depende só do texto recebido, o que o PostgreSQL
+-- exige de uma função chamada dentro de uma restrição CHECK.
+-- Recusa tamanho errado, letras e sequências repetidas (111.111.111-11),
+-- que passam no cálculo do dígito mas não são documentos reais.
+CREATE FUNCTION fn_cpf_valido(p text) RETURNS boolean
+LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE AS $$
+DECLARE s int; d1 int; d2 int; i int;
+BEGIN
+    IF p !~ '^[0-9]{11}$' OR p ~ '^(.)\1{10}$' THEN RETURN false; END IF;
+    s := 0; FOR i IN 1..9 LOOP s := s + substr(p, i, 1)::int * (11 - i); END LOOP;
+    d1 := CASE WHEN s % 11 < 2 THEN 0 ELSE 11 - s % 11 END;
+    s := 0; FOR i IN 1..10 LOOP s := s + substr(p, i, 1)::int * (12 - i); END LOOP;
+    d2 := CASE WHEN s % 11 < 2 THEN 0 ELSE 11 - s % 11 END;
+    RETURN d1 = substr(p, 10, 1)::int AND d2 = substr(p, 11, 1)::int;
+END $$;
+
+CREATE FUNCTION fn_cnpj_valido(p text) RETURNS boolean
+LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE AS $$
+DECLARE pesos1 int[] := '{5,4,3,2,9,8,7,6,5,4,3,2}';
+        pesos2 int[] := '{6,5,4,3,2,9,8,7,6,5,4,3,2}';
+        s int; d1 int; d2 int; i int;
+BEGIN
+    IF p !~ '^[0-9]{14}$' OR p ~ '^(.)\1{13}$' THEN RETURN false; END IF;
+    s := 0; FOR i IN 1..12 LOOP s := s + substr(p, i, 1)::int * pesos1[i]; END LOOP;
+    d1 := CASE WHEN s % 11 < 2 THEN 0 ELSE 11 - s % 11 END;
+    s := 0; FOR i IN 1..13 LOOP s := s + substr(p, i, 1)::int * pesos2[i]; END LOOP;
+    d2 := CASE WHEN s % 11 < 2 THEN 0 ELSE 11 - s % 11 END;
+    RETURN d1 = substr(p, 13, 1)::int AND d2 = substr(p, 14, 1)::int;
+END $$;
+
 -- ---------- Instituições ----------
 CREATE TABLE ilpi (
     id_ilpi         SERIAL PRIMARY KEY,
@@ -48,7 +83,10 @@ CREATE TABLE ilpi (
     municipio       VARCHAR(100) NOT NULL,
     uf              CHAR(2) NOT NULL DEFAULT 'PE',
     licenca_anvisa  VARCHAR(30),
-    criado_em       TIMESTAMPTZ NOT NULL DEFAULT now()
+    criado_em       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_ilpi_cnpj CHECK (fn_cnpj_valido(cnpj)),
+    CONSTRAINT ck_ilpi_uf CHECK (uf IN ('AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA',
+                                        'PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'))
 );
 
 -- ---------- Autenticação e perfis ----------
@@ -58,7 +96,10 @@ CREATE TABLE usuario (
     senha_hash   VARCHAR(255) NOT NULL,
     perfil       perfil_usuario NOT NULL,
     ativo        BOOLEAN NOT NULL DEFAULT TRUE,
-    criado_em    TIMESTAMPTZ NOT NULL DEFAULT now()
+    criado_em    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- e-mail guardado sempre em minúsculas: o UNIQUE passa a valer sem
+    -- diferenciar maiúsculas ("Ana@x.com" e "ana@x.com" seriam duas contas)
+    CONSTRAINT ck_email_formato CHECK (email ~ '^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$')
 );
 
 CREATE TABLE idoso (
@@ -74,14 +115,17 @@ CREATE TABLE idoso (
     grau_dependencia  grau_dependencia NOT NULL,
     ativo             BOOLEAN NOT NULL DEFAULT TRUE,
     CONSTRAINT ck_idoso_60mais CHECK (data_nascimento <= CURRENT_DATE - INTERVAL '60 years'),
-    CONSTRAINT ck_admissao_valida CHECK (data_admissao >= data_nascimento)
+    CONSTRAINT ck_admissao_valida CHECK (data_admissao >= data_nascimento),
+    CONSTRAINT ck_idoso_cpf CHECK (fn_cpf_valido(cpf))
 );
 
 CREATE TABLE responsavel (
     id_responsavel  SERIAL PRIMARY KEY,
     id_usuario      INT NOT NULL UNIQUE REFERENCES usuario(id_usuario),
     nome            VARCHAR(150) NOT NULL,
-    telefone        VARCHAR(20) NOT NULL
+    telefone        VARCHAR(11) NOT NULL,
+    -- só dígitos, com DDD: 10 (fixo) ou 11 (celular)
+    CONSTRAINT ck_telefone CHECK (telefone ~ '^[1-9][0-9][2-9][0-9]{7,8}$')
 );
 
 CREATE TABLE vinculo_responsavel (
@@ -182,8 +226,10 @@ CREATE TABLE pet_virtual (
     id_idoso INT NOT NULL UNIQUE REFERENCES idoso(id_idoso),
     nome     VARCHAR(60) NOT NULL,
     especie  VARCHAR(40) NOT NULL,
-    nivel    INT NOT NULL DEFAULT 1 CHECK (nivel >= 1),
     pontos   INT NOT NULL DEFAULT 0 CHECK (pontos >= 0),
+    -- nível derivado dos pontos (1 nível a cada 100): coluna gerada, nunca
+    -- fica em desacordo com os pontos e não pode ser gravada diretamente
+    nivel    INT NOT NULL GENERATED ALWAYS AS (1 + pontos / 100) STORED,
     acessorio VARCHAR(30),
     cor       VARCHAR(20)
 );
@@ -251,7 +297,7 @@ CREATE TABLE administracao_medicacao (
     CONSTRAINT ux_dose_unica UNIQUE (id_prescricao, horario_previsto)
 );
 
-CREATE INDEX ix_prescricao_idoso ON prescricao (id_idoso) WHERE ativo;
+CREATE INDEX ix_prescricao_idoso ON prescricao (id_idoso, ativo);
 CREATE INDEX ix_adm_prescricao   ON administracao_medicacao (id_prescricao, horario_previsto DESC);
 
 -- ---------- Mural da Família ----------
@@ -372,11 +418,19 @@ CREATE INDEX ix_refeicao_idoso ON registro_refeicao (id_idoso, data_hora DESC);
 CREATE TABLE consentimento_lgpd (
     id_consentimento SERIAL PRIMARY KEY,
     id_idoso         INT NOT NULL REFERENCES idoso(id_idoso),
+    -- 'dados_saude' é o que libera os registros clínicos para a família (ver RLS)
+    categoria        VARCHAR(20) NOT NULL DEFAULT 'dados_saude'
+                     CHECK (categoria IN ('dados_saude', 'imagem', 'outros')),
     finalidade       VARCHAR(200) NOT NULL,
     data_concessao   TIMESTAMPTZ NOT NULL DEFAULT now(),
     data_revogacao   TIMESTAMPTZ,
     CONSTRAINT ck_revogacao CHECK (data_revogacao IS NULL OR data_revogacao >= data_concessao)
 );
+
+-- Um consentimento vigente por idoso e categoria; o histórico (revogados) fica
+CREATE UNIQUE INDEX ux_consentimento_vigente
+    ON consentimento_lgpd (id_idoso, categoria)
+    WHERE data_revogacao IS NULL;
 
 CREATE TABLE log_auditoria (
     id_log         BIGSERIAL PRIMARY KEY,
@@ -388,7 +442,7 @@ CREATE TABLE log_auditoria (
 );
 
 -- ---------- Índices de consulta frequente ----------
-CREATE INDEX ix_idoso_ilpi            ON idoso (id_ilpi) WHERE ativo;
+CREATE INDEX ix_idoso_ilpi            ON idoso (id_ilpi, ativo);
 CREATE INDEX ix_avaliacao_idoso_data  ON avaliacao (id_idoso, data_hora DESC);
 CREATE INDEX ix_bem_estar_idoso_data  ON registro_bem_estar (id_idoso, data_hora DESC);
 CREATE INDEX ix_saude_idoso_data      ON registro_saude (id_idoso, data_hora DESC);
@@ -398,6 +452,38 @@ CREATE INDEX ix_evento_pet_data       ON evento_pet (id_pet, data_hora DESC);
 CREATE INDEX ix_auditoria_usuario     ON log_auditoria (id_usuario, data_hora DESC);
 CREATE INDEX ix_partida_j1_data       ON partida_domino (id_jogador1, data_hora DESC);
 CREATE INDEX ix_partida_j2_data       ON partida_domino (id_jogador2, data_hora DESC) WHERE id_jogador2 IS NOT NULL;
+
+-- ---------- Índices nas chaves estrangeiras ----------
+-- O PostgreSQL indexa a PK e o UNIQUE, mas não a coluna que referencia.
+-- Sem índice, apagar ou renumerar a linha referenciada (ON UPDATE CASCADE,
+-- ON DELETE SET NULL) varre a tabela filha inteira, e os JOINs pela FK
+-- também. As FKs já cobertas por um índice acima (ou por ser a 1ª coluna
+-- de uma PK) não se repetem aqui. Índices parciais só valem para isso
+-- quando o filtro é "coluna IS NOT NULL" (a busca da FK é por igualdade);
+-- por isso idoso(id_ilpi) e prescricao(id_idoso) usam índice completo.
+CREATE INDEX ix_fk_profissional_ilpi     ON profissional (id_ilpi);
+CREATE INDEX ix_fk_vinculo_responsavel   ON vinculo_responsavel (id_responsavel);
+CREATE INDEX ix_fk_avaliacao_prof        ON avaliacao (id_profissional);
+CREATE INDEX ix_fk_item_avaliacao        ON item_avaliacao (id_avaliacao);
+CREATE INDEX ix_fk_bem_estar_prof        ON registro_bem_estar (id_profissional) WHERE id_profissional IS NOT NULL;
+CREATE INDEX ix_fk_saude_prof            ON registro_saude (id_profissional);
+CREATE INDEX ix_fk_psico_prof            ON atendimento_psicologico (id_profissional);
+CREATE INDEX ix_fk_participacao_ativ     ON participacao (id_atividade);
+CREATE INDEX ix_fk_partida_ilpi          ON partida_domino (id_ilpi);
+CREATE INDEX ix_fk_prescricao_prof       ON prescricao (id_profissional);
+CREATE INDEX ix_fk_adm_prof              ON administracao_medicacao (id_profissional);
+CREATE INDEX ix_fk_mural_responsavel     ON recado_mural (id_responsavel);
+CREATE INDEX ix_fk_plantao_prof          ON recado_plantao (id_profissional);
+CREATE INDEX ix_fk_ciencia_prof          ON ciencia_plantao (id_profissional);
+CREATE INDEX ix_fk_sinal_idoso_data      ON sinal_vital (id_idoso, data_hora DESC);
+CREATE INDEX ix_fk_sinal_prof            ON sinal_vital (id_profissional);
+CREATE INDEX ix_fk_meta_idoso            ON meta_cuidado (id_idoso);
+CREATE INDEX ix_fk_meta_prof             ON meta_cuidado (id_profissional);
+CREATE INDEX ix_fk_evol_meta             ON evolucao_meta (id_meta, data_hora DESC);
+CREATE INDEX ix_fk_evol_meta_prof        ON evolucao_meta (id_profissional);
+CREATE INDEX ix_fk_interc_prof           ON intercorrencia (id_profissional);
+CREATE INDEX ix_fk_refeicao_prof         ON registro_refeicao (id_profissional);
+CREATE INDEX ix_fk_consentimento_idoso   ON consentimento_lgpd (id_idoso);
 
 -- ---------- View: Painel do Idoso ----------
 -- Visão consolidada para a tela inicial do responsável e da equipe

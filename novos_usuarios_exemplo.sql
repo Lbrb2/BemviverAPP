@@ -14,12 +14,12 @@ WITH novo AS (
 )
 -- Passo B: cria o cadastro do idoso ligado a esse login
 INSERT INTO idoso (id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia)
-SELECT 1, id_usuario, 'João Batista da Silva', '55566677788', '1945-05-20', CURRENT_DATE, 'I'
+SELECT 1, id_usuario, 'João Batista da Silva', '55566677720', '1945-05-20', CURRENT_DATE, 'I'
 FROM novo;
 
 -- Dar um pet ao novo idoso (opcional, mas simpático):
 INSERT INTO pet_virtual (id_idoso, nome, especie)
-SELECT id_idoso, 'Bento', 'cachorro' FROM idoso WHERE cpf = '55566677788';
+SELECT id_idoso, 'Bento', 'cachorro' FROM idoso WHERE cpf = '55566677720';
 
 
 -- ---------- Exemplo 2: um novo PROFISSIONAL (cuidador) ----------
@@ -50,7 +50,7 @@ FROM novo;
 INSERT INTO vinculo_responsavel (id_idoso, id_responsavel, parentesco, responsavel_legal)
 SELECT i.id_idoso, r.id_responsavel, 'filho', TRUE
 FROM idoso i, responsavel r
-WHERE i.cpf = '55566677788' AND r.telefone = '81990001111';
+WHERE i.cpf = '55566677720' AND r.telefone = '81990001111';
 
 
 -- ---------- Conferir o que foi criado ----------

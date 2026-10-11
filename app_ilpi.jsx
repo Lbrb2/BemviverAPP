@@ -3632,7 +3632,8 @@ function CartaoIdoso({ i, historicos, carregar, filhos, token, demo, podeRecado,
     if (demo) return setPriv({ ativo: true, desde: new Date().toISOString() });
     api(`/idosos/${i.id_idoso}/consentimentos`, { token })
       .then((l) => {
-        const a = l.find((x) => !x.data_revogacao);
+        // o que libera o prontuário para a família é o consentimento de dados de saúde
+        const a = l.find((x) => !x.data_revogacao && (x.categoria || "dados_saude") === "dados_saude");
         setPriv(a ? { ativo: true, id: a.id_consentimento, desde: a.data_concessao } : { ativo: false });
       })
       .catch(() => setPriv({ ativo: false }));
@@ -3643,10 +3644,10 @@ function CartaoIdoso({ i, historicos, carregar, filhos, token, demo, podeRecado,
     try {
       const r = await api("/consentimentos", {
         metodo: "POST", token,
-        corpo: { id_idoso: i.id_idoso, finalidade: "Registro e compartilhamento de dados de saúde e bem-estar com responsável legal e equipe da ILPI" },
+        corpo: { id_idoso: i.id_idoso, categoria: "dados_saude", finalidade: "Registro e compartilhamento de dados de saúde e bem-estar com responsável legal e equipe da ILPI" },
       });
       setPriv({ ativo: true, id: r.id_consentimento, desde: r.data_concessao });
-      setMsgPriv("✓ Consentimento registrado com data e hora.");
+      setMsgPriv("✓ Consentimento registrado com data e hora. Os dados de saúde voltam a aparecer na próxima vez que você entrar.");
     } catch (e) { setMsgPriv(`Não deu (${e.message}).`); }
   }
   async function revogar() {
@@ -3654,7 +3655,7 @@ function CartaoIdoso({ i, historicos, carregar, filhos, token, demo, podeRecado,
     try {
       await api(`/consentimentos/${priv.id}/revogar`, { metodo: "POST", token });
       setPriv({ ativo: false });
-      setMsgPriv("✓ Revogado. O registro histórico fica guardado, como manda a LGPD.");
+      setMsgPriv("✓ Revogado. A partir de agora a família não vê os dados de saúde (o Xodó e o mural continuam). O registro histórico fica guardado, como manda a LGPD.");
     } catch (e) { setMsgPriv(`Não deu (${e.message}).`); }
   }
   async function baixarPdf() {
@@ -3778,7 +3779,7 @@ function CartaoIdoso({ i, historicos, carregar, filhos, token, demo, podeRecado,
             )}
             {priv && !priv.ativo && (
               <span style={{ fontSize: 15, fontWeight: 700, color: "#77560C", background: CORES.aviso, border: `2px solid ${CORES.destaque}`, borderRadius: 10, padding: "4px 10px" }}>
-                Sem consentimento ativo
+                Sem consentimento ativo — dados de saúde ocultos para a família
               </span>
             )}
             {priv && (

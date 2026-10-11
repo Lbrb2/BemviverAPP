@@ -24,11 +24,11 @@ ALTER ROLE app_user WITH LOGIN PASSWORD 'app_secret_dev';
 -- o usuário, se e-mail e senha conferirem e a conta estiver ativa.
 CREATE OR REPLACE FUNCTION fn_autenticar(p_email text, p_senha text)
 RETURNS TABLE (id_usuario int, perfil perfil_usuario, funcao funcao_profissional)
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
     SELECT u.id_usuario, u.perfil, p.funcao
       FROM usuario u
       LEFT JOIN profissional p ON p.id_usuario = u.id_usuario
-     WHERE u.email = p_email
+     WHERE u.email = lower(trim(p_email))   -- e-mails são guardados em minúsculas
        AND u.ativo
        AND u.senha_hash = crypt(p_senha, u.senha_hash)
        AND (p.id_profissional IS NULL OR p.ativo)

@@ -23,7 +23,9 @@ psql -U postgres -d NOME_DO_BANCO -f etapa02/etapa02_criacao_tabelas.sql
 psql -U postgres -d NOME_DO_BANCO -f etapa02/etapa02_insercao_dados.sql
 ```
 
-- CHECK, DEFAULT e UNIQUE em todas as tabelas principais.
+- CHECK, DEFAULT e UNIQUE em todas as tabelas principais — inclusive CPF e CNPJ com dígito verificador (funções `fn_cpf_valido` / `fn_cnpj_valido` dentro do CHECK), e-mail, telefone e UF.
+- Coluna gerada: `pet_virtual.nivel` = 1 + pontos / 100.
+- Índice em todas as 49 chaves estrangeiras.
 - **ON UPDATE CASCADE**: `vinculo_responsavel` e `participacao`.
 - **ON DELETE SET NULL**: `idoso.id_usuario`, `registro_bem_estar.id_profissional`, `recado_plantao.id_idoso`.
 - Inserção com sequências (`nextval` / `currval`), **mínimo de 30 tuplas em cada uma das 30 tabelas** (o próprio script confere e aborta se faltar).

@@ -1231,6 +1231,21 @@ async function exigirGestor(client) {
   return rows[0].ilpi;
 }
 
+// Quem valida CPF, e-mail e telefone é o próprio banco (restrições CHECK
+// do schema); aqui só se traduz o nome da restrição violada (erro 23514)
+// para uma mensagem que o gestor entenda.
+const MSG_RESTRICAO = {
+  ck_idoso_cpf: "CPF inválido: confira os dígitos.",
+  ck_email_formato: "E-mail em formato inválido.",
+  ck_telefone: "Telefone inválido: use DDD + número, só dígitos (ex.: 81988887777).",
+  ck_idoso_60mais: "O cadastro de residente exige 60 anos ou mais.",
+  ck_admissao_valida: "A data de admissão não pode ser anterior ao nascimento.",
+};
+function mensagemRestricao(e) {
+  return e && e.code === "23514" ? MSG_RESTRICAO[e.constraint] || null : null;
+}
+const normalizarEmail = (s) => String(s).trim().toLowerCase();
+
 // Listar as pessoas da minha ILPI (idosos e equipe)
 app.get("/gestao/pessoas", autenticar, async (req, res) => {
   try {
@@ -1265,7 +1280,7 @@ app.post("/gestao/idosos", autenticar, async (req, res) => {
       if (email && senha) {
         const { rows } = await c.query(
           `INSERT INTO usuario (email, senha_hash, perfil)
-           VALUES ($1, crypt($2, gen_salt('bf', 10)), 'idoso') RETURNING id_usuario`, [email, senha]);
+           VALUES ($1, crypt($2, gen_salt('bf', 10)), 'idoso') RETURNING id_usuario`, [normalizarEmail(email), senha]);
         idUsuario = rows[0].id_usuario;
       }
       const { rows: idoso } = await c.query(
@@ -1281,6 +1296,7 @@ app.post("/gestao/idosos", autenticar, async (req, res) => {
   } catch (e) {
     if (e.status) return res.status(e.status).json({ erro: e.message });
     if (e.code === "23505") return res.status(409).json({ erro: "Já existe cadastro com esse email ou CPF." });
+    if (mensagemRestricao(e)) return res.status(400).json({ erro: mensagemRestricao(e) });
     console.error(e); res.status(500).json({ erro: "Falha ao cadastrar o idoso." });
   }
 });
@@ -1296,7 +1312,7 @@ app.post("/gestao/profissionais", autenticar, async (req, res) => {
       const ilpi = await exigirGestor(c);
       const { rows: u } = await c.query(
         `INSERT INTO usuario (email, senha_hash, perfil)
-         VALUES ($1, crypt($2, gen_salt('bf', 10)), 'profissional') RETURNING id_usuario`, [email, senha]);
+         VALUES ($1, crypt($2, gen_salt('bf', 10)), 'profissional') RETURNING id_usuario`, [normalizarEmail(email), senha]);
       const { rows: p } = await c.query(
         `INSERT INTO profissional (id_ilpi, id_usuario, nome, funcao, registro_conselho)
          VALUES ($1, $2, $3, $4, $5) RETURNING id_profissional`,
@@ -1307,6 +1323,7 @@ app.post("/gestao/profissionais", autenticar, async (req, res) => {
   } catch (e) {
     if (e.status) return res.status(e.status).json({ erro: e.message });
     if (e.code === "23505") return res.status(409).json({ erro: "Já existe uma conta com esse email." });
+    if (mensagemRestricao(e)) return res.status(400).json({ erro: mensagemRestricao(e) });
     console.error(e); res.status(500).json({ erro: "Falha ao cadastrar o profissional." });
   }
 });
@@ -1321,10 +1338,10 @@ app.post("/gestao/responsaveis", autenticar, async (req, res) => {
       await exigirGestor(c);
       const { rows: u } = await c.query(
         `INSERT INTO usuario (email, senha_hash, perfil)
-         VALUES ($1, crypt($2, gen_salt('bf', 10)), 'responsavel') RETURNING id_usuario`, [email, senha]);
+         VALUES ($1, crypt($2, gen_salt('bf', 10)), 'responsavel') RETURNING id_usuario`, [normalizarEmail(email), senha]);
       const { rows: resp } = await c.query(
         `INSERT INTO responsavel (id_usuario, nome, telefone) VALUES ($1, $2, $3) RETURNING id_responsavel`,
-        [u[0].id_usuario, nome, telefone]);
+        [u[0].id_usuario, nome, String(telefone).replace(/\D/g, "")]);
       await c.query(
         `INSERT INTO vinculo_responsavel (id_idoso, id_responsavel, parentesco, responsavel_legal)
          VALUES ($1, $2, $3, $4)`,
@@ -1335,6 +1352,7 @@ app.post("/gestao/responsaveis", autenticar, async (req, res) => {
   } catch (e) {
     if (e.status) return res.status(e.status).json({ erro: e.message });
     if (e.code === "23505") return res.status(409).json({ erro: "Email já cadastrado, ou já existe responsável legal para este idoso." });
+    if (mensagemRestricao(e)) return res.status(400).json({ erro: mensagemRestricao(e) });
     console.error(e); res.status(500).json({ erro: "Falha ao cadastrar o responsável." });
   }
 });
@@ -1449,7 +1467,7 @@ app.get("/idosos/:id/consentimentos", autenticar, async (req, res) => {
   try {
     const linhas = await comUsuario(req.usuario.id_usuario, async (c) => {
       const { rows } = await c.query(
-        `SELECT id_consentimento, finalidade, data_concessao, data_revogacao
+        `SELECT id_consentimento, categoria, finalidade, data_concessao, data_revogacao
            FROM consentimento_lgpd WHERE id_idoso = $1 ORDER BY data_concessao DESC`, [id]);
       return rows;
     });
@@ -1458,21 +1476,25 @@ app.get("/idosos/:id/consentimentos", autenticar, async (req, res) => {
 });
 
 app.post("/consentimentos", autenticar, async (req, res) => {
-  const { id_idoso, finalidade } = req.body || {};
+  const { id_idoso, finalidade, categoria = "dados_saude" } = req.body || {};
   if (!Number.isInteger(id_idoso) || !finalidade || !finalidade.trim())
     return res.status(400).json({ erro: "Informe id_idoso e a finalidade." });
+  if (!["dados_saude", "imagem", "outros"].includes(categoria))
+    return res.status(400).json({ erro: "Categoria deve ser dados_saude, imagem ou outros." });
   try {
     const r = await comUsuario(req.usuario.id_usuario, async (c) => {
       const { rows } = await c.query(
-        `INSERT INTO consentimento_lgpd (id_idoso, finalidade)
-         VALUES ($1, $2) RETURNING id_consentimento, data_concessao`,
-        [id_idoso, finalidade.trim().slice(0, 200)]);
+        `INSERT INTO consentimento_lgpd (id_idoso, categoria, finalidade)
+         VALUES ($1, $2, $3) RETURNING id_consentimento, categoria, data_concessao`,
+        [id_idoso, categoria, finalidade.trim().slice(0, 200)]);
       return rows[0];
     });
     res.status(201).json(r);
   } catch (e) {
     if (e.code === "42501" || String(e.message).includes("row-level security"))
       return res.status(403).json({ erro: "Só o responsável legal registra o consentimento." });
+    if (e.code === "23505")   // ux_consentimento_vigente
+      return res.status(409).json({ erro: "Já existe um consentimento vigente desta categoria." });
     console.error(e); res.status(500).json({ erro: "Falha ao registrar o consentimento." });
   }
 });

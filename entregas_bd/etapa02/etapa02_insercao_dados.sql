@@ -28,7 +28,7 @@ SET LOCAL TIME ZONE 'America/Recife';  -- horários de medicação em hora local
 -- ---------- ILPIs ----------
 INSERT INTO ilpi (id_ilpi, cnpj, nome, municipio, licenca_anvisa) VALUES
  (1, '11222333000181', 'Lar Recanto da Paz',        'Recife',  'LIC-PE-2024-0117'),
- (2, '44555666000199', 'Casa de Repouso Boa Vista', 'Caruaru', 'LIC-PE-2023-0842');
+ (2, '44555666000181', 'Casa de Repouso Boa Vista', 'Caruaru', 'LIC-PE-2023-0842');
 
 -- ---------- Usuários ----------
 INSERT INTO usuario (id_usuario, email, senha_hash, perfil) VALUES
@@ -45,10 +45,10 @@ INSERT INTO usuario (id_usuario, email, senha_hash, perfil) VALUES
 
 -- ---------- Idosos ----------
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia) VALUES
- (1, 1, 1,    'Severina Maria da Conceição', '11111111111', '1942-03-15', '2023-06-10', 'II'),
- (2, 1, 2,    'Expedito José dos Santos',    '22222222222', '1950-11-02', '2024-01-20', 'I'),
- (3, 1, NULL, 'Terezinha Alves Barbosa',     '33333333333', '1938-07-25', '2022-09-05', 'III'),
- (4, 2, NULL, 'Manoel Ferreira Lima',        '44444444444', '1947-01-30', '2024-08-12', 'I');
+ (1, 1, 1,    'Severina Maria da Conceição', '11144477735', '1942-03-15', '2023-06-10', 'II'),
+ (2, 1, 2,    'Expedito José dos Santos',    '22255588846', '1950-11-02', '2024-01-20', 'I'),
+ (3, 1, NULL, 'Terezinha Alves Barbosa',     '33366699957', '1938-07-25', '2022-09-05', 'III'),
+ (4, 2, NULL, 'Manoel Ferreira Lima',        '44477700083', '1947-01-30', '2024-08-12', 'I');
 
 -- ---------- Responsáveis e vínculos ----------
 INSERT INTO responsavel (id_responsavel, id_usuario, nome, telefone) VALUES
@@ -125,9 +125,10 @@ INSERT INTO participacao (id_idoso, id_atividade, nivel_engajamento) VALUES
  (4, 4, 3);
 
 -- ---------- Pets virtuais e eventos ----------
-INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos) VALUES
- (1, 1, 'Xodó',    'passarinho', 3, 260),
- (2, 2, 'Fubá',    'gato',       2, 140);
+-- nivel é coluna gerada (1 + pontos / 100): Xodó fica no nível 3, Fubá no 2
+INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos) VALUES
+ (1, 1, 'Xodó',    'passarinho', 260),
+ (2, 2, 'Fubá',    'gato',       140);
 
 INSERT INTO evento_pet (id_pet, origem, pontos_ganhos, data_hora) VALUES
  (1, 'checkin_bem_estar',      10, now() - INTERVAL '6 days'),
@@ -267,116 +268,116 @@ INSERT INTO usuario (id_usuario, email, senha_hash, perfil) VALUES
 -- usa currval('idoso_id_idoso_seq'), o valor que a sequência acabou de entregar.
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 1, 11, 'Manoel Messias Brandão Lins', '96424867333', (CURRENT_DATE - INTERVAL '89 years' - INTERVAL '250 days')::date, CURRENT_DATE - 1833, 'I', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Bolinha', 'peixe', 7, 640, 'chapeu', 'laranja');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Bolinha', 'peixe', 640, 'chapeu', 'laranja');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 1, 12, 'Sebastião da Silva dos Santos', '80399099611', (CURRENT_DATE - INTERVAL '93 years' - INTERVAL '173 days')::date, CURRENT_DATE - 2065, 'I', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Jabuti', 'passarinho', 7, 670, 'chapeu', 'amarelo');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Jabuti', 'passarinho', 670, 'chapeu', 'amarelo');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 1, 13, 'Iracema Lins Monteiro', '64896852052', (CURRENT_DATE - INTERVAL '95 years' - INTERVAL '39 days')::date, CURRENT_DATE - 1838, 'II', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Cuscuz', 'gato', 8, 740, 'oculos', 'amarelo');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Cuscuz', 'gato', 740, 'oculos', 'amarelo');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 1, 14, 'Raimundo Queiroz Nascimento', '59140393470', (CURRENT_DATE - INTERVAL '70 years' - INTERVAL '131 days')::date, CURRENT_DATE - 1855, 'II', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Sanfona', 'cachorro', 7, 650, 'flor', 'rosa');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Sanfona', 'cachorro', 650, 'flor', 'rosa');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 1, NULL, 'Manoel Messias Brandão Araújo', '29654718472', (CURRENT_DATE - INTERVAL '91 years' - INTERVAL '266 days')::date, CURRENT_DATE - 2022, 'III', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Fubá', 'coelho', 3, 260, 'flor', 'verde');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Fubá', 'coelho', 260, 'flor', 'verde');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 1, 15, 'João Batista Monteiro Bezerra', '30893578363', (CURRENT_DATE - INTERVAL '90 years' - INTERVAL '322 days')::date, CURRENT_DATE - 659, 'II', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Canjica', 'tartaruga', 8, 730, NULL, 'rosa');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Canjica', 'tartaruga', 730, NULL, 'rosa');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 1, 16, 'Dalva da Silva Tavares', '68689711333', (CURRENT_DATE - INTERVAL '69 years' - INTERVAL '109 days')::date, CURRENT_DATE - 874, 'I', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Lulu', 'peixe', 9, 870, NULL, 'verde');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Lulu', 'peixe', 870, NULL, 'verde');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 1, 17, 'Antônio Carlos Rêgo Vasconcelos', '81777184878', (CURRENT_DATE - INTERVAL '86 years' - INTERVAL '123 days')::date, CURRENT_DATE - 693, 'I', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Baião', 'passarinho', 9, 860, NULL, 'verde');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Baião', 'passarinho', 860, NULL, 'verde');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 1, 18, 'Benedito Siqueira Rêgo', '62826907816', (CURRENT_DATE - INTERVAL '72 years' - INTERVAL '260 days')::date, CURRENT_DATE - 973, 'II', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Pipoca', 'gato', 6, 530, 'flor', 'rosa');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Pipoca', 'gato', 530, 'flor', 'rosa');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 1, 19, 'Quitéria Melo Lins', '41211543633', (CURRENT_DATE - INTERVAL '69 years' - INTERVAL '64 days')::date, CURRENT_DATE - 1771, 'II', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Mel', 'cachorro', 8, 770, 'oculos', 'amarelo');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Mel', 'cachorro', 770, 'oculos', 'amarelo');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 1, NULL, 'Antônio Carlos Maciel Siqueira', '64514075426', (CURRENT_DATE - INTERVAL '90 years' - INTERVAL '138 days')::date, CURRENT_DATE - 1659, 'III', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Rapadura', 'coelho', 3, 270, 'flor', 'laranja');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Rapadura', 'coelho', 270, 'flor', 'laranja');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 1, NULL, 'Maria das Dores Lima Gomes', '21396045120', (CURRENT_DATE - INTERVAL '88 years' - INTERVAL '250 days')::date, CURRENT_DATE - 360, 'I', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Zé', 'tartaruga', 2, 150, NULL, 'rosa');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Zé', 'tartaruga', 150, NULL, 'rosa');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 1, NULL, 'Maria das Dores Bezerra Rêgo', '12746877210', (CURRENT_DATE - INTERVAL '96 years' - INTERVAL '347 days')::date, CURRENT_DATE - 2009, 'I', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Luar', 'peixe', 4, 310, 'flor', 'azul');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Luar', 'peixe', 310, 'flor', 'azul');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 1, NULL, 'Amara Pereira Cavalcanti', '60098947788', (CURRENT_DATE - INTERVAL '74 years' - INTERVAL '186 days')::date, CURRENT_DATE - 690, 'II', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Cocada', 'passarinho', 2, 140, 'gravata', 'verde');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Cocada', 'passarinho', 140, 'gravata', 'verde');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 1, NULL, 'Iracema Melo Pereira', '74233341033', (CURRENT_DATE - INTERVAL '78 years' - INTERVAL '272 days')::date, CURRENT_DATE - 344, 'II', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Nego', 'gato', 4, 310, 'oculos', 'laranja');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Nego', 'gato', 310, 'oculos', 'laranja');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 1, NULL, 'Josefa Correia Barbosa', '79603251895', (CURRENT_DATE - INTERVAL '67 years' - INTERVAL '276 days')::date, CURRENT_DATE - 1910, 'III', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Pirulito', 'cachorro', 3, 260, NULL, 'amarelo');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Pirulito', 'cachorro', 260, NULL, 'amarelo');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 1, NULL, 'Biu Monteiro Lins', '12197931407', (CURRENT_DATE - INTERVAL '72 years' - INTERVAL '310 days')::date, CURRENT_DATE - 955, 'II', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Caju', 'coelho', 4, 390, 'oculos', 'laranja');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Caju', 'coelho', 390, 'oculos', 'laranja');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 1, NULL, 'Raimunda Albuquerque Barbosa', '51872864473', (CURRENT_DATE - INTERVAL '81 years' - INTERVAL '78 days')::date, CURRENT_DATE - 1802, 'II', FALSE);
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 1, NULL, 'Sebastião Gomes Nascimento', '46943803115', (CURRENT_DATE - INTERVAL '75 years' - INTERVAL '73 days')::date, CURRENT_DATE - 1139, 'II', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Sabiá', 'peixe', 5, 410, NULL, 'laranja');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Sabiá', 'peixe', 410, NULL, 'laranja');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 2, NULL, 'Antônio Carlos Queiroz Wanderley', '60218946180', (CURRENT_DATE - INTERVAL '75 years' - INTERVAL '293 days')::date, CURRENT_DATE - 1394, 'II', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Biscoito', 'passarinho', 2, 170, NULL, 'laranja');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Biscoito', 'passarinho', 170, NULL, 'laranja');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 2, NULL, 'Quitéria Brandão Maciel', '95546299584', (CURRENT_DATE - INTERVAL '81 years' - INTERVAL '17 days')::date, CURRENT_DATE - 447, 'III', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Forrozinho', 'gato', 2, 140, 'chapeu', 'azul');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Forrozinho', 'gato', 140, 'chapeu', 'azul');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 2, NULL, 'Zuleide de Oliveira Tavares', '53808930667', (CURRENT_DATE - INTERVAL '75 years' - INTERVAL '91 days')::date, CURRENT_DATE - 171, 'I', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Chiquinho', 'cachorro', 1, 80, NULL, 'azul');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Chiquinho', 'cachorro', 80, NULL, 'azul');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 2, NULL, 'Dalva Vasconcelos Freitas', '95019200115', (CURRENT_DATE - INTERVAL '77 years' - INTERVAL '276 days')::date, CURRENT_DATE - 509, 'II', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Pingo', 'coelho', 1, 70, 'gravata', 'azul');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Pingo', 'coelho', 70, 'gravata', 'azul');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 2, NULL, 'Severina Rêgo Siqueira', '71185569472', (CURRENT_DATE - INTERVAL '82 years' - INTERVAL '65 days')::date, CURRENT_DATE - 1158, 'II', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Branquinha', 'tartaruga', 2, 160, 'laco', 'amarelo');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Branquinha', 'tartaruga', 160, 'laco', 'amarelo');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 2, NULL, 'Francisca Maciel Araújo', '56820820950', (CURRENT_DATE - INTERVAL '74 years' - INTERVAL '95 days')::date, CURRENT_DATE - 494, 'II', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Mimosa', 'peixe', 2, 160, 'gravata', NULL);
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Mimosa', 'peixe', 160, 'gravata', NULL);
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 2, NULL, 'Sebastião Aragão Maciel', '79357750797', (CURRENT_DATE - INTERVAL '70 years' - INTERVAL '95 days')::date, CURRENT_DATE - 2135, 'I', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Xodó', 'passarinho', 2, 120, 'gravata', 'amarelo');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Xodó', 'passarinho', 120, 'gravata', 'amarelo');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 3, NULL, 'Zuleide de Oliveira Nascimento', '27329213942', (CURRENT_DATE - INTERVAL '80 years' - INTERVAL '211 days')::date, CURRENT_DATE - 1109, 'I', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Tico', 'gato', 1, 60, 'gravata', 'rosa');
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Tico', 'gato', 60, 'gravata', 'rosa');
 INSERT INTO idoso (id_idoso, id_ilpi, id_usuario, nome, cpf, data_nascimento, data_admissao, grau_dependencia, ativo) VALUES
  (nextval('idoso_id_idoso_seq'), 3, NULL, 'Socorro Rêgo Araújo', '11656782847', (CURRENT_DATE - INTERVAL '67 years' - INTERVAL '250 days')::date, CURRENT_DATE - 455, 'I', TRUE);
-  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos, acessorio, cor) VALUES
-   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Pitoco', 'cachorro', 1, 80, 'oculos', NULL);
-INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, nivel, pontos) VALUES
- (nextval('pet_virtual_id_pet_seq'), 3, 'Sabiá', 'passarinho', 4, 380);
+  INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos, acessorio, cor) VALUES
+   (nextval('pet_virtual_id_pet_seq'), currval('idoso_id_idoso_seq'), 'Pitoco', 'cachorro', 80, 'oculos', NULL);
+INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos) VALUES
+ (nextval('pet_virtual_id_pet_seq'), 3, 'Sabiá', 'passarinho', 380);
 
 -- ---------- Profissionais complementares ----------
 INSERT INTO profissional (id_profissional, id_ilpi, id_usuario, nome, funcao, registro_conselho) VALUES
@@ -2840,37 +2841,37 @@ INSERT INTO registro_refeicao (id_idoso, id_profissional, tipo, aceitacao, hidra
  (32, 29, 'jantar', 100, 250, NULL, date_trunc('day', now()) - INTERVAL '10 days' + INTERVAL '18 hours');
 
 -- ---------- Consentimentos LGPD (um por idoso; inclui um revogado e renovado) ----------
-INSERT INTO consentimento_lgpd (id_idoso, finalidade, data_concessao, data_revogacao) VALUES
- (5, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
- (6, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
- (7, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
- (8, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
- (9, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
- (10, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '659 days', NULL),
- (11, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
- (12, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '693 days', NULL),
- (13, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
- (14, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
- (15, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
- (16, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '360 days', NULL),
- (17, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
- (18, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '690 days', NULL),
- (19, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '344 days', NULL),
- (20, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
- (21, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
- (22, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
- (23, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
- (24, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
- (25, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '447 days', NULL),
- (26, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '171 days', NULL),
- (27, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '509 days', NULL),
- (28, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
- (29, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '494 days', NULL),
- (30, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
- (31, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
- (32, 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '455 days', NULL),
- (7, 'Uso de fotografias no Mural da Família', now() - INTERVAL '200 days', now() - INTERVAL '30 days'),
- (7, 'Uso de fotografias no Mural da Família', now() - INTERVAL '10 days', NULL);
+INSERT INTO consentimento_lgpd (id_idoso, categoria, finalidade, data_concessao, data_revogacao) VALUES
+ (5, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
+ (6, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
+ (7, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
+ (8, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
+ (9, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
+ (10, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '659 days', NULL),
+ (11, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
+ (12, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '693 days', NULL),
+ (13, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
+ (14, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
+ (15, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
+ (16, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '360 days', NULL),
+ (17, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
+ (18, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '690 days', NULL),
+ (19, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '344 days', NULL),
+ (20, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
+ (21, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
+ (22, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
+ (23, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
+ (24, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
+ (25, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '447 days', NULL),
+ (26, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '171 days', NULL),
+ (27, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '509 days', NULL),
+ (28, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
+ (29, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '494 days', NULL),
+ (30, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
+ (31, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '700 days', NULL),
+ (32, 'dados_saude', 'Registro e compartilhamento de dados de saúde com responsável legal', now() - INTERVAL '455 days', NULL),
+ (7, 'imagem', 'Uso de fotografias no Mural da Família', now() - INTERVAL '200 days', now() - INTERVAL '30 days'),
+ (7, 'imagem', 'Uso de fotografias no Mural da Família', now() - INTERVAL '10 days', NULL);
 
 -- ---------- Trilha de auditoria (histórico anterior aos triggers) ----------
 INSERT INTO log_auditoria (id_usuario, acao, tabela_afetada, id_registro, data_hora) VALUES
