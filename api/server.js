@@ -930,12 +930,16 @@ app.get("/idosos/:id/prontuario", autenticar, async (req, res) => {
 
       const f = desde ? "AND data_hora >= $2" : "";
       const args = desde ? [id, desde] : [id];
+      // Funções, não promessas: as consultas rodam uma de cada vez na mesma
+      // conexão (dentro da transação). Erro não é mais engolido: antes, uma
+      // consulta com coluna errada abortava a transação e as seguintes
+      // voltavam vazias em silêncio.
       const consultas = [
-        c.query(`SELECT 'bem_estar' AS tipo, data_hora, 'Check-in de bem-estar' AS titulo,
+        () => c.query(`SELECT 'bem_estar' AS tipo, data_hora, 'Check-in de bem-estar' AS titulo,
                     ('Humor ' || coalesce(humor::text,'-') || '/5 · conforto ' || coalesce(conforto::text,'-') || '/5' ||
                      CASE WHEN dor IS NOT NULL THEN ' · dor ' || dor || '/10' ELSE '' END) AS detalhe
                  FROM registro_bem_estar WHERE id_idoso = $1 ${f}`, args),
-        c.query(`SELECT 'sinal_vital' AS tipo, data_hora, 'Sinais vitais' AS titulo,
+        () => c.query(`SELECT 'sinal_vital' AS tipo, data_hora, 'Sinais vitais' AS titulo,
                     concat_ws(' · ',
                       CASE WHEN pressao_sis IS NOT NULL THEN 'PA ' || pressao_sis || '/' || coalesce(pressao_dia::text,'?') END,
                       CASE WHEN freq_cardiaca IS NOT NULL THEN 'FC ' || freq_cardiaca END,
@@ -944,24 +948,25 @@ app.get("/idosos/:id/prontuario", autenticar, async (req, res) => {
                       CASE WHEN glicemia IS NOT NULL THEN 'Gli ' || glicemia END,
                       CASE WHEN saturacao IS NOT NULL THEN 'SpO2 ' || saturacao || '%' END) AS detalhe
                  FROM sinal_vital WHERE id_idoso = $1 ${f}`, args),
-        c.query(`SELECT 'intercorrencia' AS tipo, data_hora,
+        () => c.query(`SELECT 'intercorrencia' AS tipo, data_hora,
                     ('Intercorrência: ' || tipo || ' (' || gravidade || ')') AS titulo, descricao AS detalhe
                  FROM intercorrencia WHERE id_idoso = $1 ${f}`, args),
-        c.query(`SELECT 'refeicao' AS tipo, data_hora, ('Refeição: ' || tipo) AS titulo,
+        () => c.query(`SELECT 'refeicao' AS tipo, data_hora, ('Refeição: ' || tipo) AS titulo,
                     ('Aceitação ' || aceitacao || '%' || CASE WHEN hidratacao_ml IS NOT NULL THEN ' · ' || hidratacao_ml || 'ml' ELSE '' END) AS detalhe
                  FROM registro_refeicao WHERE id_idoso = $1 ${f}`, args),
-        c.query(`SELECT 'avaliacao' AS tipo, data_hora, ('Escala: ' || instrumento) AS titulo,
+        () => c.query(`SELECT 'avaliacao' AS tipo, data_hora, ('Escala: ' || instrumento) AS titulo,
                     (coalesce(pontuacao_total::text,'?') || ' pontos' || CASE WHEN interpretacao IS NOT NULL THEN ' — ' || interpretacao ELSE '' END) AS detalhe
                  FROM avaliacao WHERE id_idoso = $1 ${f}`, args),
-        c.query(`SELECT 'medicacao' AS tipo, a.data_hora, ('Medicação: ' || p.medicamento) AS titulo,
-                    (p.dose || CASE WHEN a.observacoes IS NOT NULL THEN ' — ' || a.observacoes ELSE '' END) AS detalhe
+        () => c.query(`SELECT 'medicacao' AS tipo, a.administrado_em AS data_hora, ('Medicação: ' || p.medicamento) AS titulo,
+                    (p.dose || ' · dose das ' || to_char(a.horario_previsto, 'HH24:MI')) AS detalhe
                  FROM administracao_medicacao a JOIN prescricao p USING (id_prescricao)
-                 WHERE p.id_idoso = $1 ${desde ? "AND a.data_hora >= $2" : ""}`, args),
-        c.query(`SELECT 'meta' AS tipo, data_criacao::timestamptz AS data_hora,
+                 WHERE p.id_idoso = $1 ${desde ? "AND a.administrado_em >= $2" : ""}`, args),
+        () => c.query(`SELECT 'meta' AS tipo, data_criacao::timestamptz AS data_hora,
                     ('Meta de cuidado: ' || categoria) AS titulo, descricao AS detalhe
                  FROM meta_cuidado WHERE id_idoso = $1 ${desde ? "AND data_criacao >= $2::date" : ""}`, args),
       ];
-      const resultados = await Promise.all(consultas.map((p) => p.catch(() => ({ rows: [] }))));
+      const resultados = [];
+      for (const consulta of consultas) resultados.push(await consulta());
       let eventos = [];
       for (const r of resultados) eventos = eventos.concat(r.rows);
       eventos.sort((a, b) => new Date(b.data_hora) - new Date(a.data_hora));

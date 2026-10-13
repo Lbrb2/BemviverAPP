@@ -67,7 +67,7 @@ api/package.json                 Dependências (express, pg, jsonwebtoken, cors)
 
 ## Instalação
 
-Requisitos: PostgreSQL 15 ou superior (a view usa `security_invoker`) e Node.js 18+.
+Requisitos: PostgreSQL 15 ou superior (a view usa `security_invoker`; testado no 16 e no 18) e Node.js 18+.
 
 ```bash
 createdb ilpi
