@@ -53,7 +53,7 @@ if errorlevel 1 goto erro
 
 echo.
 echo  === Tudo pronto! ===
-echo  Agora de um duplo clique em "iniciar_api.bat" para subir a API.
+echo  Agora de um duplo clique em "iniciar_api_windows.bat" para subir a API.
 echo.
 pause
 exit /b 0

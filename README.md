@@ -91,6 +91,8 @@ mariana.filha@email.com    responsável legal da Severina
 enf.patricia@larpaz.com    enfermeira do Recife
 psic.rodrigo@larpaz.com    psicólogo do Recife
 enf.lucia@boavista.com     enfermeira de Caruaru (outra ILPI)
+gestor@larpaz.com          gestor do Recife (cadastros e aba 📊 Consultas)
+cuid.marcos@larpaz.com     cuidador do Recife
 ```
 
 ## Modelo de segurança
