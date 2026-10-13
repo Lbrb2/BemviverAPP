@@ -1,6 +1,6 @@
 # Entregas — Projeto de Banco de Dados (Bem Viver ILPI)
 
-Modelagem e Projeto de Banco de Dados · Prof. Eduardo Nascimento de Arruda · Lucas Barreto Rodrigues de Barros
+Modelagem e Projeto de Banco de Dados · Prof. Eduardo Nascimento de Arruda · Lucas Barreto Rodrigues de Barros e Vítor Lima
 
 ## Etapa 01 — Minimundo, modelo conceitual e lógico
 
