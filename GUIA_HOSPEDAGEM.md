@@ -34,7 +34,7 @@ Render e Vercel puxam o código do GitHub. Se ainda não tem o projeto lá:
    ```
    bemviver-ilpi/
    ├── api/              (a pasta da API: server.js, package.json)
-   ├── bemviver/         (o projeto Vite do app)
+   ├── bemviver/         (o projeto Vite do app — já vem pronto no repositório)
    ├── schema_ilpi.sql
    ├── seed_ilpi.sql
    ├── rls_ilpi.sql

@@ -41,4 +41,5 @@ psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f api/setup_api.sql
 echo ""
 echo " === Tudo pronto! ==="
 echo " Agora rode:  bash iniciar_api_mac_linux.sh"
+echo " e, em outro terminal:  bash iniciar_app_mac_linux.sh"
 echo ""

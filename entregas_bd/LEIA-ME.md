@@ -33,7 +33,7 @@ psql -U postgres -d NOME_DO_BANCO -f etapa02/etapa02_insercao_dados.sql
 
 ## Etapa 03 — Primeira versão da aplicação + consultas
 
-**Aplicação:** `aplicacao_bemviver_ilpi.zip` traz o projeto inteiro. Se o professor preferir o GitHub, envie um .txt com o link do repositório. Para rodar: siga a seção "Instalação" do `README.md` dentro do zip.
+**Aplicação:** `aplicacao_bemviver_ilpi.zip` traz o projeto inteiro. Se o professor preferir o GitHub, envie um .txt com o link do repositório. Para rodar no Windows (com PostgreSQL e Node.js instalados), três duplos cliques na pasta do projeto: `instalar_windows.bat` (cria o banco), `iniciar_api_windows.bat` (liga a API) e, com a API aberta, `iniciar_app_windows.bat` (abre o app no navegador em http://localhost:5173). Detalhes na seção "Instalação" do `README.md`.
 
 **SQL das consultas:** `etapa03_consultas.sql` — 10 consultas (o mínimo é 4), 9 com JOIN, incluindo CTEs, funções de janela (RANK, PERCENT_RANK, LAG e SUM OVER), LEFT JOIN com generate_series, auto-junção, UNION ALL, NOT EXISTS, subconsulta escalar, COUNT … FILTER e CROSS JOIN LATERAL unnest. Oito delas recebem o período em dias como parâmetro (`$1`): na tela, o gestor escolhe 7, 30 ou 90 dias; no arquivo .sql, cada uma aparece como `PREPARE` + `EXECUTE` com o período padrão.
 

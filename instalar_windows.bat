@@ -53,7 +53,8 @@ if errorlevel 1 goto erro
 
 echo.
 echo  === Tudo pronto! ===
-echo  Agora de um duplo clique em "iniciar_api_windows.bat" para subir a API.
+echo  Agora de um duplo clique em "iniciar_api_windows.bat" para subir a API
+echo  e, com ela aberta, em "iniciar_app_windows.bat" para abrir o app.
 echo.
 pause
 exit /b 0

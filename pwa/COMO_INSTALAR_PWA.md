@@ -1,5 +1,8 @@
 # Transformando o Bem Viver em app instalável (PWA)
 
+> A pasta `bemviver/` do repositório já vem com estes três passos feitos. O guia abaixo
+> serve para quem montar outro projeto Vite do zero.
+
 Três passos no seu projeto Vite (a pasta "bemviver" criada com npm create vite):
 
 ## 1. Copie os arquivos

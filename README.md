@@ -54,6 +54,10 @@ migracao_008_agenda.sql          Agenda de atividades com confirmação de prese
 novos_usuarios_exemplo.sql       Cadastro manual de usuários (via SQL, para testes)
 backup_windows.bat / _mac_linux  Backup do banco com data no nome (agende diariamente!)
 pwa/                             Manifesto, service worker, ícone e guia para instalar como app
+bemviver/                        Projeto Vite que abre o app (importa ../app_ilpi.jsx; já com o PWA)
+instalar_windows.bat / _mac_linux.sh      Cria o banco e roda os 4 scripts SQL
+iniciar_api_windows.bat / _mac_linux.sh   Liga a API (porta 3000)
+iniciar_app_windows.bat / _mac_linux.sh   Abre o app no navegador (porta 5173)
 app_ilpi.jsx                     App completo: check-in e Dominó do Lar (idoso), painel
                                  do responsável, e área da equipe com alertas, lançamento
                                  de check-ins, avaliações clínicas e evolução psicológica
@@ -81,7 +85,17 @@ npm install
 PGDATABASE=ilpi npm start        # API em http://localhost:3000
 ```
 
-Para o app, abra `app_ilpi.jsx` num ambiente React (Vite, por exemplo) com o componente como rota principal — ele contém as três áreas (idoso com o Dominó do Lar, responsável e equipe), roteadas pelo perfil de quem loga. Ajuste `API_URL` no topo do arquivo se a API não estiver em `localhost:3000`. Sem a API no ar, o botão "Ver demonstração" mantém o app navegável.
+No Windows, o mesmo sai com três duplos cliques, nesta ordem: `instalar_windows.bat` (uma vez), `iniciar_api_windows.bat` e, com a API aberta, `iniciar_app_windows.bat`.
+
+O app fica na pasta `bemviver/`, um projeto Vite que importa `app_ilpi.jsx` da raiz (as telas de idoso, responsável, equipe e gestor, roteadas pelo perfil de quem loga):
+
+```bash
+cd bemviver
+npm install
+npm run dev                      # app em http://localhost:5173
+```
+
+A API é procurada em `localhost:3000`; para outro endereço, defina `VITE_API_URL`. Sem a API no ar, o botão "Ver demonstração" mantém o app navegável.
 
 Todos os usuários do seed autenticam com a senha `demo123`:
 
