@@ -223,7 +223,7 @@ WITH pontos AS (
       LEFT JOIN checkins c  ON c.id_idoso  = i.id_idoso
      WHERE i.ativo
 ), indice AS (
-    SELECT *,
+    SELECT residente, xodo, checkins, atividades, pontos_xodo,
            round(100 * (
                0.4 * COALESCE(checkins    / NULLIF(max(checkins)    OVER (), 0)::numeric, 0)
              + 0.4 * COALESCE(atividades  / NULLIF(max(atividades)  OVER (), 0)::numeric, 0)

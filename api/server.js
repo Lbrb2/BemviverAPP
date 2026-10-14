@@ -146,7 +146,13 @@ app.post("/auth/login", async (req, res) => {
 app.get("/painel", autenticar, async (req, res) => {
   try {
     const linhas = await comUsuario(req.usuario.id_usuario, async (c) => {
-      const { rows } = await c.query("SELECT * FROM vw_painel_idoso ORDER BY nome");
+      const { rows } = await c.query(
+        `SELECT id_idoso, nome, grau_dependencia, ilpi, idade,
+                ultimo_humor, ultimo_conforto, ultima_dor, ultimo_checkin,
+                ultima_avaliacao, ultima_pontuacao, data_ultima_avaliacao,
+                pet, nivel_pet, pontos_pet, atividades_30d
+           FROM vw_painel_idoso
+          ORDER BY nome`);
       return rows;
     });
     res.json(linhas);
@@ -1530,7 +1536,9 @@ app.get("/idosos/:id/relatorio", autenticar, async (req, res) => {
   try {
     const d = await comUsuario(req.usuario.id_usuario, async (c) => {
       const ini = `${mes}-01`;
-      const { rows: p } = await c.query("SELECT * FROM vw_painel_idoso WHERE id_idoso = $1", [id]);
+      const { rows: p } = await c.query(
+        `SELECT nome, idade, grau_dependencia, ilpi, pet, nivel_pet, pontos_pet, atividades_30d
+           FROM vw_painel_idoso WHERE id_idoso = $1`, [id]);
       if (!p.length) return null;
       const { rows: bem } = await c.query(
         `SELECT count(*)::int AS registros, round(avg(humor),1) AS humor, round(avg(conforto),1) AS conforto, round(avg(dor),1) AS dor
