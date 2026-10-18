@@ -1,9 +1,6 @@
 -- ============================================================
 -- ENTREGA ETAPA 02 — SQL DE INSERÇÃO DE DADOS
 -- Projeto: Bem Viver ILPI · SGBD: PostgreSQL 16
--- Executar depois de etapa02_criacao_tabelas.sql.
--- * No mínimo 30 tuplas em CADA uma das 30 tabelas — o bloco final
---   "Conferência" aborta a transação se alguma tabela ficar abaixo disso.
 -- * Ids gerados por sequência: nextval('<tabela>_<coluna>_seq') nas linhas
 --   novas e currval(...) para as tabelas filhas apontarem ao registro
 --   recém-criado (idoso -> pet, avaliação -> itens, prescrição -> doses...).
