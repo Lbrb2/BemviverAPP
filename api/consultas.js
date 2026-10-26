@@ -316,4 +316,179 @@ SELECT i.nome                          AS residente,
 HAVING count(*) >= 2
  ORDER BY quedas DESC, residente`,
   },
+  // ------------------------------------------------------------------
+  // ETAPA 04 — consultas avançadas (11 a 14) e as duas visões (15 e 16).
+  // Mesma lógica de entregas_bd/etapa04/etapa04_consultas.sql, aqui com
+  // período e filtro como parâmetros ($1, $2) escolhidos na tela.
+  // "filtro" só aceita os valores listados em "opcoes" (a API confere).
+  // ------------------------------------------------------------------
+  {
+    id: 11,
+    etapa: 4,
+    titulo: "Residentes sem aferição de sinais vitais",
+    pergunta: "Quem está há dias sem ter pressão, saturação ou temperatura medidas?",
+    tecnicas: ["ANTI JOIN (LEFT JOIN + IS NULL)", "filtro no ON", "parâmetros $1 e $2"],
+    periodo: { padrao: 7, opcoes: [3, 7, 15], rotulo: "Sem aferição nos últimos" },
+    filtro: { rotulo: "Grau de dependência", padrao: "todos",
+              opcoes: [["todos", "Todos"], ["I", "Grau I"], ["II", "Grau II"], ["III", "Grau III"]] },
+    grafico: { tipo: "pizza", contar: "grau_dependencia", rotulo: "Residentes sem aferição, por grau de dependência" },
+    sql: `SELECT i.nome                   AS residente,
+       'Grau ' || i.grau_dependencia AS grau_dependencia,
+       to_char(i.data_admissao, 'DD/MM/YYYY') AS admitido_em
+  FROM idoso i
+  LEFT JOIN sinal_vital s
+         ON s.id_idoso = i.id_idoso
+        AND s.data_hora >= now() - make_interval(days => $1::int)
+ WHERE i.ativo
+   AND s.id_sinal IS NULL
+   AND ($2::text = 'todos' OR i.grau_dependencia::text = $2::text)
+ ORDER BY i.grau_dependencia DESC, i.nome`,
+  },
+  {
+    id: 12,
+    etapa: 4,
+    titulo: "Intercorrências × recados de plantão",
+    pergunta: "A passagem de plantão está acompanhando o que acontece com os residentes?",
+    tecnicas: ["FULL OUTER JOIN", "CTE", "COALESCE", "CASE", "parâmetro $1"],
+    periodo: { padrao: 30, opcoes: [30, 60, 90] },
+    grafico: { tipo: "pizza", contar: "situacao", rotulo: "Residentes por situação do registro" },
+    sql: `WITH intercorrencias AS (
+    SELECT id_idoso, count(*) AS qtd, max(data_hora) AS ultima
+      FROM intercorrencia
+     WHERE data_hora >= now() - make_interval(days => $1::int)
+     GROUP BY id_idoso
+), recados AS (
+    SELECT id_idoso, count(*) AS qtd, max(data_hora) AS ultimo
+      FROM recado_plantao
+     WHERE id_idoso IS NOT NULL
+       AND data_hora >= now() - make_interval(days => $1::int)
+     GROUP BY id_idoso
+)
+SELECT i.nome                              AS residente,
+       COALESCE(ic.qtd, 0)                 AS intercorrencias,
+       COALESCE(rp.qtd, 0)                 AS recados_plantao,
+       to_char(ic.ultima, 'DD/MM HH24:MI') AS ultima_intercorrencia,
+       to_char(rp.ultimo, 'DD/MM HH24:MI') AS ultimo_recado,
+       CASE
+           WHEN rp.id_idoso IS NULL THEN 'Intercorrência sem recado no plantão'
+           WHEN ic.id_idoso IS NULL THEN 'Recado sem intercorrência registrada'
+           ELSE 'Registrado nos dois'
+       END                                 AS situacao
+  FROM intercorrencias ic
+  FULL OUTER JOIN recados rp ON rp.id_idoso = ic.id_idoso
+  JOIN idoso i ON i.id_idoso = COALESCE(ic.id_idoso, rp.id_idoso)
+ ORDER BY situacao, i.nome`,
+  },
+  {
+    id: 13,
+    etapa: 4,
+    titulo: "Dor acima da média da própria ILPI",
+    pergunta: "Quem está relatando mais dor que os colegas da mesma casa?",
+    tecnicas: ["subconsulta correlacionada no SELECT", "subconsulta no HAVING", "AVG", "parâmetro $1"],
+    periodo: { padrao: 30, opcoes: [30, 60, 90] },
+    grafico: { tipo: "barras", x: "residente", y: ["dor_media_residente"], max: 10, ref: "dor_media_ilpi",
+               rotulo: "Dor média do residente (0 a 10) — a linha tracejada é a média da ILPI" },
+    sql: `SELECT i.nome                   AS residente,
+       count(*)                 AS checkins,
+       round(avg(r.dor), 2)     AS dor_media_residente,
+       (SELECT round(avg(r2.dor), 2)
+          FROM registro_bem_estar r2
+          JOIN idoso i2 ON i2.id_idoso = r2.id_idoso
+         WHERE i2.id_ilpi = i.id_ilpi
+           AND i2.ativo
+           AND r2.data_hora >= now() - make_interval(days => $1::int)) AS dor_media_ilpi
+  FROM idoso i
+  JOIN registro_bem_estar r ON r.id_idoso = i.id_idoso
+ WHERE i.ativo
+   AND r.data_hora >= now() - make_interval(days => $1::int)
+ GROUP BY i.id_idoso, i.nome, i.id_ilpi
+HAVING avg(r.dor) > (SELECT avg(r2.dor)
+                       FROM registro_bem_estar r2
+                       JOIN idoso i2 ON i2.id_idoso = r2.id_idoso
+                      WHERE i2.id_ilpi = i.id_ilpi
+                        AND i2.ativo
+                        AND r2.data_hora >= now() - make_interval(days => $1::int))
+ ORDER BY dor_media_residente DESC, i.nome`,
+  },
+  {
+    id: 14,
+    etapa: 4,
+    titulo: "Agenda de revisão do plano de cuidado",
+    pergunta: "Quais metas ativas precisam ser revisadas em breve, e quando tiveram evolução?",
+    tecnicas: ["subconsultas escalares correlacionadas", "IN (subconsulta)", "índice parcial", "parâmetros $1 e $2"],
+    periodo: { padrao: 15, opcoes: [7, 15, 30], rotulo: "Revisão nos próximos" },
+    filtro: { rotulo: "Categoria da meta", padrao: "todas",
+              opcoes: [["todas", "Todas"], ["saude", "Saúde"], ["mobilidade", "Mobilidade"], ["nutricao", "Nutrição"],
+                       ["social", "Social"], ["cognitiva", "Cognitiva"], ["emocional", "Emocional"], ["autonomia", "Autonomia"]] },
+    grafico: { tipo: "pizza", contar: "categoria", rotulo: "Metas a revisar, por categoria" },
+    sql: `SELECT i.nome                                AS residente,
+       m.categoria,
+       m.descricao                           AS meta,
+       pr.nome                               AS responsavel_meta,
+       to_char(m.data_revisao, 'DD/MM/YYYY') AS data_revisao,
+       m.data_revisao - CURRENT_DATE         AS dias_para_revisao,
+       (SELECT to_char(max(e.data_hora), 'DD/MM/YYYY')
+          FROM evolucao_meta e
+         WHERE e.id_meta = m.id_meta)        AS ultima_evolucao,
+       (SELECT count(*)
+          FROM evolucao_meta e
+         WHERE e.id_meta = m.id_meta)        AS qtd_evolucoes
+  FROM meta_cuidado m
+  JOIN idoso i         ON i.id_idoso = m.id_idoso
+  JOIN profissional pr ON pr.id_profissional = m.id_profissional
+ WHERE m.status = 'ativa'
+   AND m.data_revisao <= CURRENT_DATE + $1::int
+   AND m.id_profissional IN (SELECT id_profissional FROM profissional WHERE ativo)
+   AND i.ativo
+   AND ($2::text = 'todas' OR m.categoria::text = $2::text)
+ ORDER BY m.data_revisao, i.nome`,
+  },
+  {
+    id: 15,
+    etapa: 4,
+    visao: true,
+    titulo: "Visão: mapa de medicação",
+    pergunta: "Cada prescrição ativa, quem prescreveu, a última dose e as doses da semana (vw_mapa_medicacao).",
+    tecnicas: ["VISÃO com 4 JOINs + LEFT JOIN", "FILTER", "parâmetro $1"],
+    filtro: { rotulo: "Mostrar", padrao: "abaixo",
+              opcoes: [["abaixo", "Só abaixo do previsto"], ["todas", "Todas as prescrições"]] },
+    grafico: { tipo: "barras", x: "residente_medicamento", y: ["adesao_semana_pct"], max: 100, alerta_abaixo: 90,
+               rotulo: "Doses dadas na semana, em % das previstas" },
+    sql: `SELECT residente || ' · ' || medicamento AS residente_medicamento,
+       dose,
+       horarios,
+       prescrito_por,
+       to_char(ultima_dose, 'DD/MM HH24:MI') AS ultima_dose,
+       doses_dadas_semana,
+       doses_previstas_semana,
+       round(100.0 * doses_dadas_semana / NULLIF(doses_previstas_semana, 0), 1) AS adesao_semana_pct
+  FROM vw_mapa_medicacao
+ WHERE $1::text = 'todas' OR doses_dadas_semana < doses_previstas_semana
+ ORDER BY adesao_semana_pct NULLS LAST, residente, medicamento`,
+  },
+  {
+    id: 16,
+    etapa: 4,
+    visao: true,
+    titulo: "Visão: intercorrências e quem avisar",
+    pergunta: "O que aconteceu, se a família já sabe e para quem ligar (vw_intercorrencia_contato).",
+    tecnicas: ["VISÃO com 3 JOINs + 2 LEFT JOINs", "parâmetros $1 e $2"],
+    periodo: { padrao: 30, opcoes: [7, 30, 90] },
+    filtro: { rotulo: "Família", padrao: "nao_avisada",
+              opcoes: [["nao_avisada", "Ainda não avisada"], ["todas", "Todas as intercorrências"]] },
+    grafico: { tipo: "pizza", contar: "tipo", rotulo: "Intercorrências por tipo" },
+    sql: `SELECT to_char(data_hora, 'DD/MM HH24:MI') AS quando,
+       residente,
+       tipo,
+       gravidade,
+       registrado_por,
+       CASE WHEN familia_avisada THEN 'sim' ELSE 'não' END AS familia_avisada,
+       responsavel_legal,
+       parentesco,
+       telefone_responsavel
+  FROM vw_intercorrencia_contato
+ WHERE data_hora >= now() - make_interval(days => $1::int)
+   AND ($2::text = 'todas' OR NOT familia_avisada)
+ ORDER BY gravidade DESC, data_hora DESC`,
+  },
 ];

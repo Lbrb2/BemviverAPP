@@ -2035,7 +2035,7 @@ const FUNCOES_PROF = [
 ];
 
 function VisaoGestor({ token, demo }) {
-  const [aba, setAba] = useState("pessoas");
+  const [aba, setAba] = useState("dashboard");
   const [pessoas, setPessoas] = useState(null);
 
   async function carregar() {
@@ -2049,9 +2049,10 @@ function VisaoGestor({ token, demo }) {
 
   const Abas = (
     <div role="tablist" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
-      {[["pessoas", "👥 Pessoas"], ["consultas", "📊 Consultas"], ["idoso", "➕ Idoso"], ["prof", "➕ Profissional"], ["resp", "➕ Responsável"]].map(([id, rot]) => (
+      {[["dashboard", "📈 Dashboard"], ["consultas", "📊 Consultas"], ["pessoas", "👥 Pessoas"], ["cuidadores", "🤝 Cuidadores"],
+        ["idoso", "➕ Idoso"], ["prof", "➕ Profissional"], ["resp", "➕ Responsável"]].map(([id, rot]) => (
         <button key={id} role="tab" aria-selected={aba === id} onClick={() => setAba(id)} style={{
-          flex: "1 1 40%", fontSize: 16, fontWeight: 700, padding: "12px 6px", borderRadius: 12,
+          flex: aba === "dashboard" ? "1 1 140px" : "1 1 40%", fontSize: 16, fontWeight: 700, padding: "12px 6px", borderRadius: 12,
           border: aba === id ? `3px solid ${CORES.anil}` : "2px solid #D8CFBC",
           background: aba === id ? "#E7ECF8" : CORES.cartao, cursor: "pointer",
           fontFamily: "'Atkinson Hyperlegible', sans-serif",
@@ -2061,12 +2062,14 @@ function VisaoGestor({ token, demo }) {
   );
 
   return (
-    <main style={{ maxWidth: 620, margin: "0 auto", padding: 22 }}>
+    <main style={{ maxWidth: aba === "dashboard" ? 1180 : 620, margin: "0 auto", padding: 22 }}>
       <h2 style={{ fontSize: 24, margin: "0 0 4px" }}>Gestão da ILPI</h2>
       <p style={{ fontSize: 16, color: CORES.nota, margin: "0 0 16px" }}>
-        Você cadastra os residentes, a equipe e os responsáveis da sua instituição.
+        Indicadores da casa, consultas, cadastros e a equipe da sua instituição.
       </p>
       {Abas}
+      {aba === "dashboard" && <PainelDashboard token={token} demo={demo} />}
+      {aba === "cuidadores" && <PainelCuidadores token={token} demo={demo} />}
       {aba === "pessoas" && <ListaPessoas pessoas={pessoas} token={token} demo={demo} aoMudar={carregar} />}
       {aba === "consultas" && <PainelConsultas token={token} demo={demo} />}
       {aba === "idoso" && <FormIdoso token={token} demo={demo} aoSalvar={carregar} />}
@@ -2085,9 +2088,11 @@ const num = (v) => (v === null || v === undefined || v === "" ? null : Number(v)
 const nomeCurto = (t) => { const p = String(t).trim().split(/\s+/); return p.length > 2 ? `${p[0]} ${p[p.length - 1]}` : String(t); };
 const ROTULO_COL = (c) => c.replace(/_/g, " ").replace(/\bpct\b/, "%").replace(/\bml\b/, "(ml)");
 
-function GraficoBarrasH({ linhas, x, y, max, alerta, alerta_abaixo, rotulo }) {
+function GraficoBarrasH({ linhas, x, y, max, alerta, alerta_abaixo, rotulo, linhaRef, nomeInteiro }) {
   const vals = linhas.map((l) => num(l[y]) ?? 0);
   const teto = max || Math.max(1, ...vals);
+  // linha de referência (ex.: média da ILPI), tracejada sobre as barras
+  const vRef = linhaRef && linhas.length ? num(linhas[0][linhaRef]) : null;
   return (
     <figure style={{ margin: "0 0 14px" }} aria-label={rotulo}>
       <figcaption style={{ fontSize: 14, color: CORES.nota, marginBottom: 6 }}>{rotulo}</figcaption>
@@ -2096,9 +2101,14 @@ function GraficoBarrasH({ linhas, x, y, max, alerta, alerta_abaixo, rotulo }) {
         const ruim = (alerta != null && v >= alerta) || (alerta_abaixo != null && v < alerta_abaixo);
         return (
           <div key={k} style={{ display: "grid", gridTemplateColumns: "minmax(90px, 38%) 1fr 52px", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <span style={{ fontSize: 14, textAlign: "right", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={String(l[x])}>{nomeCurto(l[x])}</span>
-            <div style={{ background: "#EFE8D8", borderRadius: 6, height: 18 }}>
+            <span style={{ fontSize: 14, textAlign: "right", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={String(l[x])}>{nomeInteiro ? String(l[x]) : nomeCurto(l[x])}</span>
+            <div style={{ background: "#EFE8D8", borderRadius: 6, height: 18, position: "relative" }}>
               <div style={{ width: `${Math.max(1.5, (100 * v) / teto)}%`, height: "100%", borderRadius: 6, background: ruim ? CORES.alerta : CORES.anil }} />
+              {vRef !== null && (
+                <div title={`${ROTULO_COL(linhaRef)}: ${vRef}`} style={{
+                  position: "absolute", top: -3, bottom: -3, left: `${(100 * vRef) / teto}%`, borderLeft: `3px dashed ${CORES.destaque}`,
+                }} />
+              )}
             </div>
             <span style={{ fontSize: 14, fontWeight: 700, color: ruim ? CORES.alerta : CORES.tinta }}>{v}{ruim ? " ⚠" : ""}</span>
           </div>
@@ -2130,7 +2140,9 @@ function GraficoLinhas({ linhas, x, ys, rotulo }) {
             <text x={esq - 4} y={py(maxV * f) + 4} fontSize="10" textAnchor="end" fill={CORES.nota}>{+(maxV * f).toFixed(1)}</text>
           </g>
         ))}
-        {linhas.map((l, k) => <text key={k} x={px(k)} y={H - 10} fontSize="10" textAnchor="middle" fill={CORES.nota}>{l[x]}</text>)}
+        {linhas.map((l, k, todas) => (k % Math.ceil(todas.length / 8) === 0 ||
+            (k === todas.length - 1 && k % Math.ceil(todas.length / 8) >= Math.ceil(todas.length / 8) / 2))
+          ? <text key={k} x={px(k)} y={H - 10} fontSize="10" textAnchor="middle" fill={CORES.nota}>{l[x]}</text> : null)}
         {series.map((vs, si) => (
           <g key={si}>
             {trechos(vs).map((t, ti) => (
@@ -2148,6 +2160,203 @@ function GraficoLinhas({ linhas, x, ys, rotulo }) {
           </span>
         ))}
       </div>
+    </figure>
+  );
+}
+
+// ---------- Gráficos do dashboard (SVG puro, sem biblioteca) ----------
+const PALETA = ["#27418F", "#2E7D46", "#C2701F", "#B3402A", "#6E4C9E", "#1F7F86", "#8A6D1A", "#A34E7C"];
+const fmt = (v, casas = 1) => (v === null || v === undefined || Number.isNaN(Number(v)) ? "—" : Number(v).toLocaleString("pt-BR", { maximumFractionDigits: casas }));
+
+// Pizza ou rosca. Com aoClicar, cada fatia (e o item da legenda) vira um filtro.
+function GraficoPizza({ dados, rotulo, rosca, selecionado, aoClicar }) {
+  const total = dados.reduce((t, d) => t + d.valor, 0);
+  if (!total) return <p style={{ fontSize: 15, color: CORES.nota }}>Sem registros no período.</p>;
+  const R = 80, r = rosca ? 46 : 0, C = 90;
+  let ang = -Math.PI / 2;
+  const ponto = (a, raio) => `${C + raio * Math.cos(a)},${C + raio * Math.sin(a)}`;
+  const fatias = dados.map((d, k) => {
+    const a0 = ang, a1 = ang + (2 * Math.PI * d.valor) / total;
+    ang = a1;
+    const grande = a1 - a0 > Math.PI ? 1 : 0;
+    const caminho = d.valor === total
+      ? `M ${C} ${C - R} A ${R} ${R} 0 1 1 ${C - 0.01} ${C - R} Z`
+      : `M ${ponto(a0, R)} A ${R} ${R} 0 ${grande} 1 ${ponto(a1, R)} L ${r ? ponto(a1, r) : `${C},${C}`} ${r ? `A ${r} ${r} 0 ${grande} 0 ${ponto(a0, r)}` : ""} Z`;
+    return { ...d, caminho, cor: d.cor || PALETA[k % PALETA.length] };
+  });
+  return (
+    <figure style={{ margin: 0 }} aria-label={rotulo}>
+      {rotulo && <figcaption style={{ fontSize: 14, color: CORES.nota, marginBottom: 6 }}>{rotulo}</figcaption>}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+        <svg viewBox="0 0 180 180" style={{ width: 170, maxWidth: "45%", flexShrink: 0 }} role="img">
+          {fatias.map((f) => (
+            <path key={f.rotulo} d={f.caminho} fill={f.cor} stroke={CORES.cartao} strokeWidth="2"
+              opacity={selecionado && selecionado !== f.chave ? 0.35 : 1}
+              style={{ cursor: aoClicar ? "pointer" : "default" }} onClick={aoClicar ? () => aoClicar(f.chave) : undefined}>
+              <title>{`${f.rotulo}: ${f.valor} (${fmt((100 * f.valor) / total)}%)`}</title>
+            </path>
+          ))}
+          {rosca && <circle cx={C} cy={C} r={r} fill={CORES.cartao} />}
+          {rosca && <text x={C} y={C + 6} textAnchor="middle" fontSize="20" fontWeight="700" fill={CORES.tinta}>{total}</text>}
+        </svg>
+        <ul style={{ listStyle: "none", padding: 0, margin: 0, flex: 1, minWidth: 140 }}>
+          {fatias.map((f) => {
+            const conteudo = (
+              <>
+                <span style={{ width: 12, height: 12, borderRadius: 3, background: f.cor, display: "inline-block", flexShrink: 0 }} />
+                <span style={{ flex: 1 }}>{f.rotulo}</span>
+                <b>{f.valor}</b><span style={{ color: CORES.nota, minWidth: 44, textAlign: "right" }}>{fmt((100 * f.valor) / total)}%</span>
+              </>
+            );
+            const estilo = { display: "flex", alignItems: "center", gap: 8, fontSize: 14, padding: "3px 4px", width: "100%" };
+            return (
+              <li key={f.rotulo}>
+                {aoClicar ? (
+                  <button onClick={() => aoClicar(f.chave)} aria-pressed={selecionado === f.chave} style={{
+                    ...estilo, border: selecionado === f.chave ? `2px solid ${CORES.anil}` : "2px solid transparent",
+                    borderRadius: 8, background: selecionado === f.chave ? "#E7ECF8" : "transparent", cursor: "pointer",
+                    fontFamily: "'Atkinson Hyperlegible', sans-serif", textAlign: "left", color: CORES.tinta,
+                  }}>{conteudo}</button>
+                ) : <div style={estilo}>{conteudo}</div>}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </figure>
+  );
+}
+
+// Colunas verticais (histograma). "marcas" desenha linhas verticais em
+// valores da escala (ex.: média e mediana).
+function GraficoColunas({ dados, rotulo, marcas = [], cor = CORES.anil, sufixo = "" }) {
+  const W = 340, H = 190, esq = 30, dir = 10, topo = 26, base = 26;
+  const maxV = Math.max(1, ...dados.map((d) => d.valor));
+  const n = dados.length, larg = (W - esq - dir) / n;
+  const px = (k) => esq + larg * k + larg / 2;
+  const py = (v) => topo + (H - topo - base) * (1 - v / maxV);
+  // posição de um valor contínuo da escala (os rótulos são numéricos)
+  const pxValor = (v) => {
+    const xs = dados.map((d) => Number(d.rotulo));
+    if (xs.some(Number.isNaN) || n < 2) return null;
+    return px(0) + ((v - xs[0]) / (xs[n - 1] - xs[0])) * (px(n - 1) - px(0));
+  };
+  return (
+    <figure style={{ margin: 0 }} aria-label={rotulo}>
+      {rotulo && <figcaption style={{ fontSize: 14, color: CORES.nota, marginBottom: 6 }}>{rotulo}</figcaption>}
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", background: CORES.cartao, borderRadius: 10 }} role="img">
+        {[0, 0.5, 1].map((f) => (
+          <g key={f}>
+            <line x1={esq} x2={W - dir} y1={py(maxV * f)} y2={py(maxV * f)} stroke="#E4DCC9" />
+            <text x={esq - 4} y={py(maxV * f) + 4} fontSize="10" textAnchor="end" fill={CORES.nota}>{fmt(maxV * f, 0)}</text>
+          </g>
+        ))}
+        {dados.map((d, k) => (
+          <g key={d.rotulo}>
+            <rect x={px(k) - larg * 0.38} y={py(d.valor)} width={larg * 0.76} height={H - base - py(d.valor)} rx="3" fill={d.cor || cor}>
+              <title>{`${d.rotulo}: ${d.valor}${sufixo}${d.extra ? " · " + d.extra : ""}`}</title>
+            </rect>
+            {d.valor > 0 && (H - base - py(d.valor) > 18
+              ? <text x={px(k)} y={py(d.valor) + 13} fontSize="10.5" fontWeight="700" textAnchor="middle" fill="#fff">{d.valor}</text>
+              : <text x={px(k)} y={py(d.valor) - 3} fontSize="10" textAnchor="middle" fill={CORES.tinta}>{d.valor}</text>)}
+            <text x={px(k)} y={H - 10} fontSize="10.5" textAnchor="middle" fill={CORES.nota}>{d.rotuloCurto || d.rotulo}</text>
+          </g>
+        ))}
+        {marcas.map((m, i) => {
+          const x = pxValor(m.valor);
+          if (x === null || m.valor === null || m.valor === undefined) return null;
+          // rótulos alternam lado (esquerda/direita da linha) para não se sobreporem
+          return (
+            <g key={m.nome}>
+              <line x1={x} x2={x} y1={topo - 6} y2={H - base} stroke={m.cor} strokeWidth="2.5" strokeDasharray={m.traco || ""} />
+              <text x={i % 2 ? x + 4 : x - 4} y={topo - 4} fontSize="10" fill={m.cor} fontWeight="700"
+                textAnchor={i % 2 ? "start" : "end"}>{m.nome} {fmt(m.valor, 2)}</text>
+            </g>
+          );
+        })}
+      </svg>
+    </figure>
+  );
+}
+
+// Radar: um eixo por categoria, valores de 0 a "max"; várias séries sobrepostas.
+function GraficoRadar({ eixos, series, max = 100, rotulo, sufixo = "%" }) {
+  const C = 120, R = 82, n = eixos.length;
+  const ang = (k) => -Math.PI / 2 + (2 * Math.PI * k) / n;
+  const pt = (k, v) => [C + R * (v / max) * Math.cos(ang(k)), C + R * (v / max) * Math.sin(ang(k))];
+  return (
+    <figure style={{ margin: 0 }} aria-label={rotulo}>
+      {rotulo && <figcaption style={{ fontSize: 14, color: CORES.nota, marginBottom: 6 }}>{rotulo}</figcaption>}
+      <svg viewBox="0 0 240 240" style={{ width: "100%", maxWidth: 320, display: "block", margin: "0 auto" }} role="img">
+        {[0.25, 0.5, 0.75, 1].map((f) => (
+          <polygon key={f} points={eixos.map((_, k) => pt(k, max * f).join(",")).join(" ")} fill="none" stroke="#E4DCC9" />
+        ))}
+        {eixos.map((e, k) => {
+          const [x, y] = pt(k, max * 1.2);
+          return (
+            <g key={e}>
+              <line x1={C} y1={C} x2={pt(k, max)[0]} y2={pt(k, max)[1]} stroke="#E4DCC9" />
+              <text x={x} y={y + 4} fontSize="11" textAnchor="middle" fill={CORES.tinta}>{e}</text>
+            </g>
+          );
+        })}
+        <text x={C + 3} y={C - R * 0.5 + 3} fontSize="9" fill={CORES.nota}>{fmt(max * 0.5, 0)}{sufixo}</text>
+        {series.map((s) => (
+          <g key={s.nome}>
+            <polygon points={s.valores.map((v, k) => pt(k, v || 0).join(",")).join(" ")}
+              fill={s.cor} fillOpacity="0.18" stroke={s.cor} strokeWidth="2.5" strokeDasharray={s.traco || ""} />
+            {s.valores.map((v, k) => (
+              <circle key={k} cx={pt(k, v || 0)[0]} cy={pt(k, v || 0)[1]} r="3.5" fill={s.cor}>
+                <title>{`${s.nome} — ${eixos[k]}: ${fmt(v)}${sufixo}`}</title>
+              </circle>
+            ))}
+          </g>
+        ))}
+      </svg>
+      <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap", marginTop: 4 }}>
+        {series.map((s) => (
+          <span key={s.nome} style={{ fontSize: 14, display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <svg width="26" height="8"><line x1="0" x2="26" y1="4" y2="4" stroke={s.cor} strokeWidth="3" strokeDasharray={s.traco || ""} /></svg>
+            {s.nome}
+          </span>
+        ))}
+      </div>
+    </figure>
+  );
+}
+
+// Dispersão com a reta de regressão y = a + b·x calculada no banco.
+function GraficoDispersao({ pontos, reta, rotuloX, rotuloY, rotulo, yMin = 1, yMax = 5 }) {
+  const W = 340, H = 220, esq = 34, dir = 12, topo = 12, base = 34;
+  const xMax = Math.max(1, ...pontos.map((p) => p.x));
+  const px = (v) => esq + ((W - esq - dir) * v) / xMax;
+  const py = (v) => topo + (H - topo - base) * (1 - (v - yMin) / (yMax - yMin));
+  const passo = Math.max(1, Math.ceil(xMax / 6));
+  return (
+    <figure style={{ margin: 0 }} aria-label={rotulo}>
+      {rotulo && <figcaption style={{ fontSize: 14, color: CORES.nota, marginBottom: 6 }}>{rotulo}</figcaption>}
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", background: CORES.cartao, borderRadius: 10 }} role="img">
+        {[yMin, (yMin + yMax) / 2, yMax].map((v) => (
+          <g key={v}>
+            <line x1={esq} x2={W - dir} y1={py(v)} y2={py(v)} stroke="#E4DCC9" />
+            <text x={esq - 4} y={py(v) + 4} fontSize="10" textAnchor="end" fill={CORES.nota}>{v}</text>
+          </g>
+        ))}
+        {Array.from({ length: Math.floor(xMax / passo) + 1 }, (_, k) => k * passo).map((v) => (
+          <text key={v} x={px(v)} y={H - 20} fontSize="10" textAnchor="middle" fill={CORES.nota}>{v}</text>
+        ))}
+        <text x={(W + esq) / 2} y={H - 4} fontSize="10.5" textAnchor="middle" fill={CORES.tinta}>{rotuloX}</text>
+        <text x={10} y={(H - base) / 2} fontSize="10.5" textAnchor="middle" fill={CORES.tinta} transform={`rotate(-90 10 ${(H - base) / 2})`}>{rotuloY}</text>
+        {reta && reta.b !== null && reta.a !== null && (
+          <line x1={px(0)} y1={py(Math.min(yMax, Math.max(yMin, reta.a)))} x2={px(xMax)}
+            y2={py(Math.min(yMax, Math.max(yMin, reta.a + reta.b * xMax)))} stroke={CORES.alerta} strokeWidth="2" strokeDasharray="6 4" />
+        )}
+        {pontos.map((p, k) => (
+          <circle key={k} cx={px(p.x)} cy={py(p.y)} r="5" fill={CORES.anil} fillOpacity="0.7" stroke="#fff">
+            <title>{`${p.rotulo}: ${p.x} atividade(s), humor médio ${fmt(p.y, 2)}`}</title>
+          </circle>
+        ))}
+      </svg>
     </figure>
   );
 }
@@ -2173,12 +2382,24 @@ function PainelConsultas({ token, demo }) {
     api("/consultas", { token }).then(setLista).catch((e) => { setErro(e.message); setLista([]); });
   }, []); // eslint-disable-line
 
-  async function abrir(c, dias) {
+  // dias e filtro vão como parâmetros na URL; a API confere se o valor é
+  // uma das opções da consulta e o repassa ao SQL como $1/$2
+  async function abrir(c, dias, filtro) {
     setErro(""); setVerSql(false); setCarregando(c.id);
-    try { setRes(await api(`/consultas/${c.id}${dias ? `?dias=${dias}` : ""}`, { token })); }
+    const q = new URLSearchParams();
+    if (dias) q.set("dias", dias);
+    if (filtro) q.set("filtro", filtro);
+    try { setRes(await api(`/consultas/${c.id}${q.toString() ? `?${q}` : ""}`, { token })); }
     catch (e) { setErro(`Não consegui rodar a consulta (${e.message}).`); setRes(null); }
     finally { setCarregando(null); }
   }
+  const botaoOpcao = (ativo, rotulo, onClick) => (
+    <button key={rotulo} onClick={onClick} aria-pressed={ativo} style={{
+      fontSize: 15, fontWeight: 700, padding: "6px 12px", borderRadius: 10, minHeight: 40, cursor: "pointer",
+      border: `2px solid ${CORES.anil}`, background: ativo ? CORES.anil : CORES.cartao,
+      color: ativo ? "#fff" : CORES.anil, fontFamily: "'Atkinson Hyperlegible', sans-serif",
+    }}>{rotulo}</button>
+  );
 
   if (demo) return (
     <Cartao><p style={{ fontSize: 17, margin: 0 }}>
@@ -2194,8 +2415,14 @@ function PainelConsultas({ token, demo }) {
       </p>
       {erro && <Aviso msg={erro} />}
       <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
-        {lista.map((c) => (
-          <button key={c.id} onClick={() => abrir(c)} aria-pressed={res && res.id === c.id} style={{
+        {lista.map((c, k) => (
+          <div key={c.id} style={{ display: "contents" }}>
+          {(k === 0 || lista[k - 1].etapa !== c.etapa) && (
+            <h3 style={{ fontSize: 17, margin: k === 0 ? "0 0 2px" : "10px 0 2px", color: CORES.nota }}>
+              {c.etapa === 4 ? "Etapa 04 — consultas avançadas e visões" : "Etapa 03 — consultas da primeira versão"}
+            </h3>
+          )}
+          <button onClick={() => abrir(c)} aria-pressed={res && res.id === c.id} style={{
             textAlign: "left", padding: "12px 14px", borderRadius: 12, cursor: "pointer",
             border: res && res.id === c.id ? `3px solid ${CORES.anil}` : "2px solid #D8CFBC",
             background: res && res.id === c.id ? "#E7ECF8" : CORES.cartao, fontFamily: "'Atkinson Hyperlegible', sans-serif",
@@ -2203,6 +2430,7 @@ function PainelConsultas({ token, demo }) {
             <div style={{ fontSize: 16, fontWeight: 700 }}>{c.id}. {c.titulo}{carregando === c.id ? " …" : ""}</div>
             <div style={{ fontSize: 14, color: CORES.nota }}>{c.pergunta}</div>
           </button>
+          </div>
         ))}
       </div>
 
@@ -2210,23 +2438,37 @@ function PainelConsultas({ token, demo }) {
         <Cartao>
           <h3 style={{ fontSize: 19, margin: "0 0 10px" }}>{res.titulo}</h3>
           {res.periodo && (
-            <div role="group" aria-label="Período da consulta" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-              <span style={{ fontSize: 15, color: CORES.nota }}>Últimos</span>
-              {res.periodo.opcoes.map((d) => (
-                <button key={d} onClick={() => abrir(res, d)} aria-pressed={res.periodo.dias === d} style={{
-                  fontSize: 15, fontWeight: 700, padding: "6px 12px", borderRadius: 10, minHeight: 40, cursor: "pointer",
-                  border: `2px solid ${CORES.anil}`, background: res.periodo.dias === d ? CORES.anil : CORES.cartao,
-                  color: res.periodo.dias === d ? "#fff" : CORES.anil, fontFamily: "'Atkinson Hyperlegible', sans-serif",
-                }}>{d} dias</button>
-              ))}
+            <div role="group" aria-label="Período da consulta" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+              <span style={{ fontSize: 15, color: CORES.nota }}>{res.periodo.rotulo || "Últimos"}</span>
+              {res.periodo.opcoes.map((d) => botaoOpcao(res.periodo.dias === d, `${d} dias`,
+                () => abrir(res, d, res.filtro && res.filtro.valor)))}
             </div>
+          )}
+          {res.filtro && (
+            <div role="group" aria-label={res.filtro.rotulo} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+              <span style={{ fontSize: 15, color: CORES.nota }}>{res.filtro.rotulo}:</span>
+              {res.filtro.opcoes.map(([v, r]) => botaoOpcao(res.filtro.valor === v, r,
+                () => abrir(res, res.periodo && res.periodo.dias, v)))}
+            </div>
+          )}
+          {res.visao && (
+            <p style={{ fontSize: 14, color: CORES.nota, margin: "0 0 10px" }}>
+              Esta tela lê uma <b>visão</b> do banco: o SQL abaixo consulta a visão como se fosse uma tabela.
+            </p>
           )}
           {res.linhas.length === 0 ? (
             <p style={{ fontSize: 16 }}>Nenhuma linha retornada — nada a alertar por aqui.</p>
+          ) : g.tipo === "pizza" ? (
+            <div style={{ marginBottom: 14 }}>
+              <GraficoPizza rotulo={g.rotulo} dados={Object.entries(res.linhas.reduce((acc, l) => {
+                const k = l[g.contar] ?? "—"; acc[k] = (acc[k] || 0) + 1; return acc;
+              }, {})).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ rotulo: String(k).replace(/_/g, " "), chave: k, valor: v }))} />
+              <p style={{ fontSize: 15, margin: "8px 0 0" }}><b>{res.linhas.length}</b> linha(s) no resultado.</p>
+            </div>
           ) : g.tipo === "linhas" ? (
             <GraficoLinhas linhas={res.linhas} x={g.x} ys={g.y} rotulo={g.rotulo} />
           ) : (
-            <GraficoBarrasH linhas={(g.sem_nulos ? res.linhas.filter((l) => l[g.y[0]] !== null) : res.linhas).slice(0, 15)} x={g.x} y={g.y[0]} max={g.max} alerta={g.alerta} alerta_abaixo={g.alerta_abaixo}
+            <GraficoBarrasH linhas={(g.sem_nulos ? res.linhas.filter((l) => l[g.y[0]] !== null) : res.linhas).slice(0, 15)} x={g.x} y={g.y[0]} max={g.max} alerta={g.alerta} alerta_abaixo={g.alerta_abaixo} linhaRef={g.ref}
               rotulo={g.rotulo + (res.linhas.length > 15 ? ` — 15 primeiros de ${res.linhas.length}` : "")} />
           )}
 
@@ -2270,16 +2512,331 @@ function PainelConsultas({ token, demo }) {
   );
 }
 
+// ============================================================
+// DASHBOARD ESTATÍSTICO (gestor) — os SQLs ficam em api/dashboard.js.
+// Cada número e gráfico é calculado agora no banco, com o RLS da ILPI.
+// Filtros: período, grau de dependência (também clicando na rosca) e a
+// medida de bem-estar analisada (humor, conforto ou dor).
+// ============================================================
+const ROTULO_CAT = {
+  fisica: "Física", social: "Social", cognitiva: "Cognitiva", artistica: "Artística", espiritual: "Espiritual",
+  queda: "Queda", lesao: "Lesão", mal_estar: "Mal-estar", comportamento: "Comportamento", fuga: "Fuga", obito: "Óbito", outro: "Outro",
+  cafe: "Café", almoco: "Almoço", lanche: "Lanche", jantar: "Jantar", ceia: "Ceia",
+};
+function forcaCorrelacao(r) {
+  if (r === null || r === undefined) return "sem dados suficientes";
+  const a = Math.abs(r), sentido = r > 0 ? "positiva" : "negativa";
+  if (a < 0.1) return "praticamente nenhuma relação";
+  if (a < 0.3) return `correlação ${sentido} fraca`;
+  if (a < 0.7) return `correlação ${sentido} moderada`;
+  return `correlação ${sentido} forte`;
+}
+
+function CartaoGrafico({ titulo, sobre, sql, children }) {
+  const [verSql, setVerSql] = useState(false);
+  return (
+    <section style={{ background: CORES.cartao, border: "2px solid #E4DCC9", borderRadius: 16, padding: 14, minWidth: 0 }}>
+      <h3 style={{ fontSize: 18, margin: "0 0 2px" }}>{titulo}</h3>
+      {sobre && <p style={{ fontSize: 14, color: CORES.nota, margin: "0 0 10px" }}>{sobre}</p>}
+      {children}
+      {sql && (
+        <>
+          <button onClick={() => setVerSql(!verSql)} style={{
+            marginTop: 10, fontSize: 14, fontWeight: 700, padding: "6px 10px", borderRadius: 8, cursor: "pointer",
+            border: `2px solid ${CORES.anil}`, background: verSql ? "#E7ECF8" : CORES.cartao, color: CORES.anil,
+            fontFamily: "'Atkinson Hyperlegible', sans-serif",
+          }}>{verSql ? "Esconder SQL" : "🧾 SQL"}</button>
+          {verSql && <pre style={{ fontSize: 12, background: "#26201A", color: "#F3EEE0", padding: 10, borderRadius: 10, overflowX: "auto", marginTop: 8, lineHeight: 1.4 }}>{sql}</pre>}
+        </>
+      )}
+    </section>
+  );
+}
+
+function Indicador({ rotulo, valor, detalhe, variacao, melhor = "maior", alerta }) {
+  // variacao: diferença em relação ao período anterior (null = sem comparação)
+  let seta = null;
+  if (variacao !== null && variacao !== undefined && !Number.isNaN(variacao)) {
+    const bom = variacao === 0 ? null : (variacao > 0) === (melhor === "maior");
+    seta = (
+      <span style={{ fontSize: 14, fontWeight: 700, color: bom === null ? CORES.nota : bom ? CORES.verde : CORES.alerta }}>
+        {variacao > 0 ? "▲" : variacao < 0 ? "▼" : "="} {fmt(Math.abs(variacao), 2)} vs. período anterior
+      </span>
+    );
+  }
+  return (
+    <div style={{
+      background: alerta ? CORES.alertaFundo : CORES.cartao, border: `2px solid ${alerta ? CORES.alerta : "#E4DCC9"}`,
+      borderRadius: 14, padding: "12px 14px", minWidth: 0,
+    }}>
+      <div style={{ fontSize: 14, color: CORES.nota }}>{rotulo}</div>
+      <div style={{ fontSize: 30, fontWeight: 700, color: alerta ? CORES.alerta : CORES.tinta, lineHeight: 1.15 }}>{valor}</div>
+      {detalhe && <div style={{ fontSize: 14, color: CORES.nota }}>{detalhe}</div>}
+      {seta}
+    </div>
+  );
+}
+
+function PainelDashboard({ token, demo }) {
+  const [filtros, setFiltros] = useState({ dias: 30, grau: "todos", medida: "humor" });
+  const [d, setD] = useState(null);
+  const [erro, setErro] = useState("");
+  const [carregando, setCarregando] = useState(false);
+
+  useEffect(() => {
+    if (demo) return;
+    setCarregando(true); setErro("");
+    api(`/dashboard?dias=${filtros.dias}&grau=${filtros.grau}&medida=${filtros.medida}`, { token })
+      .then(setD).catch((e) => setErro(`Não consegui montar o dashboard (${e.message}).`))
+      .finally(() => setCarregando(false));
+  }, [filtros.dias, filtros.grau, filtros.medida]); // eslint-disable-line
+
+  if (demo) return (
+    <Cartao><p style={{ fontSize: 17, margin: 0 }}>
+      O dashboard é calculado direto no banco de dados. Entre com a conta de gestor e a API ligada para vê-lo.
+    </p></Cartao>
+  );
+  if (erro) return <Aviso msg={erro} />;
+  if (!d) return <p style={{ fontSize: 16, color: CORES.nota }}>Calculando no banco…</p>;
+
+  const k = d.indicadores, e = d.estatisticas, M = d.filtros.medidas[filtros.medida];
+  const n = (v) => num(v);
+  const dif = (a, b) => (n(a) === null || n(b) === null ? null : +(n(a) - n(b)).toFixed(2));
+  const chip = (ativo, rotulo, onClick, titulo) => (
+    <button key={rotulo} onClick={onClick} aria-pressed={ativo} title={titulo} style={{
+      fontSize: 15, fontWeight: 700, padding: "7px 12px", borderRadius: 10, minHeight: 42, cursor: "pointer",
+      border: `2px solid ${CORES.anil}`, background: ativo ? CORES.anil : CORES.cartao,
+      color: ativo ? "#fff" : CORES.anil, fontFamily: "'Atkinson Hyperlegible', sans-serif",
+    }}>{rotulo}</button>
+  );
+  const grupo = (rotulo, conteudo) => (
+    <div role="group" aria-label={rotulo} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+      <span style={{ fontSize: 15, color: CORES.nota, minWidth: 70 }}>{rotulo}</span>{conteudo}
+    </div>
+  );
+  const nomeGrau = filtros.grau === "todos" ? "todos os residentes" : `residentes de grau ${filtros.grau}`;
+  const reg = d.regressao || {}, cor = d.correlacao || {};
+  const tendMedida = n(reg[`${filtros.medida}_por_semana`]);
+  const deficit = n(k.cuidadores_necessarios) > n(k.cuidadores_na_equipe);
+
+  return (
+    <div>
+      {/* ---------- Filtros ---------- */}
+      <div style={{ background: "#F3EEE0", borderRadius: 14, padding: 12, display: "grid", gap: 8, marginBottom: 14 }}>
+        {grupo("Período", d.filtros.opcoes_dias.map((x) => chip(filtros.dias === x, `${x} dias`, () => setFiltros({ ...filtros, dias: x }))))}
+        {grupo("Grau", [["todos", "Todos"], ["I", "Grau I"], ["II", "Grau II"], ["III", "Grau III"]].map(([v, r]) =>
+          chip(filtros.grau === v, r, () => setFiltros({ ...filtros, grau: v }))))}
+        {grupo("Medida", Object.entries(d.filtros.medidas).map(([v, m]) =>
+          chip(filtros.medida === v, m.rotulo, () => setFiltros({ ...filtros, medida: v }), `Analisar ${m.rotulo.toLowerCase()} no histograma e nas estatísticas`)))}
+        <span style={{ fontSize: 14, color: CORES.nota }} aria-live="polite">
+          {carregando ? "Recalculando no banco…" : `Mostrando ${nomeGrau}, últimos ${filtros.dias} dias.`}
+        </span>
+      </div>
+
+      {/* ---------- Indicadores resumidos ---------- */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 14 }}>
+        <Indicador rotulo="Residentes no recorte" valor={k.residentes} detalhe={`${fmt(k.pct_residentes_com_checkin)}% fizeram check-in`} />
+        <Indicador rotulo="Check-ins de bem-estar" valor={k.checkins}
+          detalhe={n(k.residentes) ? `${fmt(n(k.checkins) / n(k.residentes) / filtros.dias, 2)} por residente/dia` : null} />
+        <Indicador rotulo="Humor médio (1 a 5)" valor={fmt(k.humor_medio, 2)} variacao={dif(k.humor_medio, k.humor_medio_anterior)} />
+        <Indicador rotulo="Dor média (0 a 10)" valor={fmt(k.dor_media, 2)} variacao={dif(k.dor_media, k.dor_media_anterior)} melhor="menor" />
+        <Indicador rotulo="Intercorrências" valor={k.intercorrencias} variacao={dif(k.intercorrencias, k.intercorrencias_anterior)} melhor="menor" />
+        <Indicador rotulo="Adesão à medicação (7 dias)" valor={`${fmt(k.adesao_pct)}%`} detalhe={`${k.doses_dadas} de ${k.doses_previstas} doses`}
+          alerta={n(k.adesao_pct) !== null && n(k.adesao_pct) < 90} />
+        <Indicador rotulo="Aceitação alimentar média" valor={k.aceitacao_alimentar_media === null ? "—" : `${fmt(k.aceitacao_alimentar_media)}%`} />
+        <Indicador rotulo="Cuidadores por turno (RDC 502)" valor={`${k.cuidadores_na_equipe} / ${k.cuidadores_necessarios}`}
+          detalhe={deficit ? "equipe abaixo do mínimo" : "na equipe / exigidos"} alerta={deficit} />
+      </div>
+
+      {/* ---------- Gráficos ---------- */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(330px, 1fr))", gap: 12 }}>
+        <CartaoGrafico titulo={`1. Distribuição: ${M.rotulo.toLowerCase()} (${M.min} a ${M.max})`}
+          sobre="Frequência de cada valor marcado nos check-ins, com as medidas de tendência central e de dispersão."
+          sql={d.sql.histograma + ";\n\n" + d.sql.estatisticas}>
+          <GraficoColunas dados={d.histograma.map((h) => ({ rotulo: String(h.valor), valor: n(h.frequencia), extra: `${fmt(h.percentual)}% dos registros` }))}
+            marcas={[{ nome: "média", valor: n(e.media), cor: CORES.alerta }, { nome: "mediana", valor: n(e.mediana), cor: CORES.verde, traco: "5 3" }]} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 10 }}>
+            {[["n", e.n, 0], ["Média", e.media, 2], ["Mediana", e.mediana, 2], ["Moda", e.moda, 0], ["Variância", e.variancia, 2],
+              ["Desvio padrão", e.desvio_padrao, 2], ["Coef. de variação", e.coef_variacao_pct === null ? null : `${fmt(e.coef_variacao_pct)}%`, null],
+              ["Mínimo", e.minimo, 0], ["Máximo", e.maximo, 0]].map(([r, v, c]) => (
+              <div key={r} style={{ background: "#F3EEE0", borderRadius: 8, padding: "6px 8px" }}>
+                <div style={{ fontSize: 12.5, color: CORES.nota }}>{r}</div>
+                <div style={{ fontSize: 17, fontWeight: 700 }}>{c === null ? (v ?? "—") : fmt(v, c)}</div>
+              </div>
+            ))}
+          </div>
+        </CartaoGrafico>
+
+        <CartaoGrafico titulo="2. Tendência no tempo"
+          sobre={`Média ${filtros.dias <= 30 ? "diária" : "semanal"} de humor, conforto e dor. A reta de tendência (mínimos quadrados) é calculada no banco com regr_slope.`}
+          sql={d.sql.tendencia + ";\n\n" + d.sql.regressao}>
+          {d.tendencia.length ? <GraficoLinhas linhas={d.tendencia} x="periodo" ys={["humor_medio", "conforto_medio", "dor_media"]} rotulo="" /> :
+            <p style={{ fontSize: 15, color: CORES.nota }}>Sem check-ins no período.</p>}
+          <p style={{ fontSize: 15, margin: "6px 0 0" }}>
+            Tendência de <b>{M.rotulo.toLowerCase()}</b>: {tendMedida === null ? "—" : (
+              <b style={{ color: Math.abs(tendMedida) < 0.02 ? CORES.nota : (tendMedida > 0) === (M.melhor === "maior") ? CORES.verde : CORES.alerta }}>
+                {tendMedida > 0 ? "+" : ""}{fmt(tendMedida, 3)} ponto(s) por semana
+              </b>
+            )}
+          </p>
+        </CartaoGrafico>
+
+        <CartaoGrafico titulo="3. Residentes por grau de dependência"
+          sobre="Toque numa fatia (ou na legenda) para filtrar o dashboard inteiro por aquele grau. Toque de novo para voltar a todos."
+          sql={d.sql.residentes_grau}>
+          <GraficoPizza rosca selecionado={filtros.grau === "todos" ? null : filtros.grau}
+            aoClicar={(g) => setFiltros({ ...filtros, grau: filtros.grau === g ? "todos" : g })}
+            dados={d.residentes_grau.map((g, i) => ({ rotulo: `Grau ${g.categoria}`, chave: g.categoria, valor: n(g.total), cor: [CORES.verde, "#C2701F", CORES.alerta][i] }))} />
+        </CartaoGrafico>
+
+        <CartaoGrafico titulo="4. Intercorrências por tipo"
+          sobre="Frequência de cada tipo de ocorrência no período (passe o dedo ou o mouse para ver o percentual)."
+          sql={d.sql.intercorrencias_tipo}>
+          <GraficoPizza dados={d.intercorrencias_tipo.map((t) => ({ rotulo: `${ROTULO_CAT[t.categoria] || t.categoria}${n(t.graves) ? ` (${t.graves} grave)` : ""}`, chave: t.categoria, valor: n(t.total) }))} />
+        </CartaoGrafico>
+
+        <CartaoGrafico titulo="5. Participação nas atividades"
+          sobre="% dos residentes que foram a pelo menos uma atividade de cada tipo: período atual comparado ao anterior."
+          sql={d.sql.radar_atividades}>
+          <GraficoRadar eixos={d.radar_atividades.map((r) => ROTULO_CAT[r.categoria] || r.categoria)}
+            series={[
+              { nome: `Últimos ${filtros.dias} dias`, cor: CORES.anil, valores: d.radar_atividades.map((r) => n(r.pct_atual)) },
+              { nome: "Período anterior", cor: "#C2701F", traco: "5 4", valores: d.radar_atividades.map((r) => n(r.pct_anterior)) },
+            ]} />
+        </CartaoGrafico>
+
+        <CartaoGrafico titulo="6. Correlação: atividades × humor"
+          sobre="Cada ponto é um residente. Quem participa de mais atividades está de melhor humor? O coeficiente de Pearson (corr) e a reta (regr_slope, regr_intercept) vêm do banco."
+          sql={d.sql.dispersao + ";\n\n" + d.sql.correlacao}>
+          <GraficoDispersao rotuloX="atividades no período" rotuloY="humor médio"
+            pontos={d.dispersao.filter((p) => p.humor_medio !== null).map((p) => ({ x: n(p.atividades), y: n(p.humor_medio), rotulo: p.nome }))}
+            reta={{ a: n(cor.intercepto), b: n(cor.inclinacao) }} />
+          <p style={{ fontSize: 15, margin: "6px 0 0" }}>
+            r = <b>{fmt(cor.r_pearson, 3)}</b> · r² = {fmt(cor.r2, 3)} · n = {cor.n} → {forcaCorrelacao(n(cor.r_pearson))}.
+          </p>
+        </CartaoGrafico>
+
+        <CartaoGrafico titulo="7. Aceitação alimentar por refeição"
+          sobre="Média do quanto foi aceito em cada refeição (0 a 100%), com o desvio padrão."
+          sql={d.sql.refeicoes}>
+          {d.refeicoes.length ? (
+            <GraficoColunas sufixo="%" cor={CORES.verde}
+              dados={d.refeicoes.map((r) => ({ rotulo: ROTULO_CAT[r.refeicao] || r.refeicao, valor: n(r.aceitacao_media),
+                extra: `desvio padrão ${fmt(r.desvio_padrao)} · ${r.registros} registros · ${r.hidratacao_media_ml} ml de líquido` }))} />
+          ) : <p style={{ fontSize: 15, color: CORES.nota }}>Sem refeições registradas no período.</p>}
+        </CartaoGrafico>
+
+        <CartaoGrafico titulo="8. Pressão arterial por classificação"
+          sobre="Aferições do período classificadas pela função fn_classificar_pressao (Etapa 05), segundo a Diretriz Brasileira de Hipertensão."
+          sql={d.sql.pressao}>
+          {d.pressao.length ? (
+            <GraficoBarrasH linhas={d.pressao.map((p) => ({ classe: p.classe, afericoes: n(p.afericoes) }))} x="classe" y="afericoes" rotulo="Nº de aferições" nomeInteiro />
+          ) : <p style={{ fontSize: 15, color: CORES.nota }}>Sem aferições de pressão no período.</p>}
+        </CartaoGrafico>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// CUIDADORES DE REFERÊNCIA — executa o procedimento com cursor
+// sp_distribuir_cuidadores (Etapa 05) e mostra o resultado
+// ============================================================
+function PainelCuidadores({ token, demo }) {
+  const [d, setD] = useState(null);
+  const [log, setLog] = useState([]);
+  const [msg, setMsg] = useState("");
+
+  async function carregar() {
+    if (demo) return setD({ cuidadores: [], sem_referencia: [], necessarios: 0 });
+    try { setD(await api("/gestao/cuidadores", { token })); } catch (e) { setMsg(e.message); }
+  }
+  useEffect(() => { carregar(); }, []); // eslint-disable-line
+
+  async function distribuir(refazer) {
+    if (demo) return setMsg("A distribuição funciona com a API conectada.");
+    setMsg("");
+    try {
+      const r = await api("/gestao/cuidadores/distribuir", { metodo: "POST", token, corpo: { refazer } });
+      setLog(r.mensagens);
+      carregar();
+    } catch (e) { setMsg(e.message); }
+  }
+
+  if (!d) return <Cartao>Carregando…</Cartao>;
+  return (
+    <div>
+      <Cartao>
+        <p style={{ fontSize: 16, margin: "0 0 8px" }}>
+          Cada residente tem um <b>cuidador de referência</b>. A divisão equilibra a carga de trabalho, não só o número de
+          residentes: grau I vale 3 pontos, grau II vale 6 e grau III vale 10 (proporção da RDC 502).
+        </p>
+        <p style={{ fontSize: 15, color: CORES.nota, margin: "0 0 12px" }}>
+          Os botões executam no banco o procedimento <code>sp_distribuir_cuidadores</code>. Ele usa um <b>cursor</b> e trata um
+          residente por vez, sempre para o cuidador com menos carga naquele momento.
+        </p>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <BotaoGrande cor={CORES.verde} onClick={() => distribuir(false)} disabled={d.sem_referencia.length === 0}>
+            {d.sem_referencia.length ? `Distribuir quem está sem referência (${d.sem_referencia.length})` : "Todos já têm referência ✓"}
+          </BotaoGrande>
+          <BotaoGrande onClick={() => distribuir(true)}>Refazer a divisão toda</BotaoGrande>
+        </div>
+        <Aviso msg={msg} />
+      </Cartao>
+
+      {log.length > 0 && (
+        <Cartao borda={CORES.verde}>
+          <p style={{ fontSize: 17, fontWeight: 700, margin: "0 0 6px" }}>O que o procedimento fez</p>
+          <ol style={{ fontSize: 15, margin: 0, paddingLeft: 22, maxHeight: 220, overflowY: "auto" }}>
+            {log.map((m, i) => <li key={i}>{m}</li>)}
+          </ol>
+        </Cartao>
+      )}
+
+      <Cartao>
+        <p style={{ fontSize: 17, fontWeight: 700, margin: "0 0 4px" }}>
+          Carga por cuidador · {d.cuidadores.length} na equipe, {d.necessarios} exigido(s) por turno (fn_cuidadores_necessarios)
+        </p>
+        {d.cuidadores.length === 0 ? <p style={{ fontSize: 15, color: CORES.nota }}>Nenhum cuidador ativo.</p> : (
+          <>
+            <GraficoBarrasH linhas={d.cuidadores} x="nome" y="pontos_de_carga" rotulo="Pontos de carga" />
+            {d.cuidadores.map((c) => (
+              <p key={c.id_profissional} style={{ fontSize: 14, margin: "4px 0" }}>
+                <b>{nomeCurto(c.nome)}</b> ({c.residentes}): <span style={{ color: CORES.nota }}>{c.lista || "nenhum residente"}</span>
+              </p>
+            ))}
+          </>
+        )}
+        {d.sem_referencia.length > 0 && (
+          <p style={{ fontSize: 15, color: CORES.alerta, margin: "10px 0 0" }}>
+            Sem referência: {d.sem_referencia.map((i) => `${nomeCurto(i.nome)} (${i.grau_dependencia})`).join(", ")}
+          </p>
+        )}
+      </Cartao>
+    </div>
+  );
+}
+
 function ListaPessoas({ pessoas, token, demo, aoMudar }) {
   const [editando, setEditando] = useState(null); // {tipo, dados}
   const [msg, setMsg] = useState("");
+  const [desligar, setDesligar] = useState(null);   // residente aguardando confirmação
+  const [historico, setHistorico] = useState(null); // log do grau de dependência (trigger)
 
   async function toggle(tipo, id, ativoAtual) {
     if (demo) return setMsg("A ativação funciona com a API conectada.");
     try {
-      await api(`/gestao/${tipo}/${id}/ativo`, { metodo: "POST", token, corpo: { ativo: !ativoAtual } });
+      const r = await api(`/gestao/${tipo}/${id}/ativo`, { metodo: "POST", token, corpo: { ativo: !ativoAtual } });
+      // mensagens dos procedimentos do banco (desligamento / redistribuição de cuidadores)
+      setMsg(r.mensagens && r.mensagens.length ? "✓ " + r.mensagens.join(" · ") : "");
       aoMudar();
     } catch (e) { setMsg(e.message); }
+  }
+  async function abrirEdicaoIdoso(i) {
+    setEditando({ tipo: "idosos", dados: { id: i.id_idoso, nome: i.nome, grau_dependencia: i.grau_dependencia } });
+    setHistorico(null);
+    if (demo) return setHistorico([]);
+    try { setHistorico(await api(`/gestao/idosos/${i.id_idoso}/historico-grau`, { token })); } catch { setHistorico([]); }
   }
   async function salvarEdicao() {
     const { tipo, dados } = editando;
@@ -2323,9 +2880,12 @@ function ListaPessoas({ pessoas, token, demo, aoMudar }) {
       <Aviso msg={msg} />
       <h3 style={{ fontSize: 20, margin: "0 0 8px" }}>Residentes ({pessoas.idosos.filter((i) => i.ativo).length} ativos)</h3>
       {pessoas.idosos.map((i) => linha(
-        i.nome, `grau ${i.grau_dependencia} · ${i.email || "sem login próprio"}`, i.ativo,
-        () => setEditando({ tipo: "idosos", dados: { id: i.id_idoso, nome: i.nome, grau_dependencia: i.grau_dependencia } }),
-        () => toggle("idosos", i.id_idoso, i.ativo)
+        i.nome,
+        `grau ${i.grau_dependencia} · ${i.email || "sem login próprio"}` +
+          (i.ativo ? ` · cuidador de referência: ${i.cuidador_referencia ? nomeCurto(i.cuidador_referencia) : "não definido"}` : ""),
+        i.ativo,
+        () => abrirEdicaoIdoso(i),
+        () => (i.ativo ? setDesligar(i) : toggle("idosos", i.id_idoso, i.ativo))
       ))}
       <h3 style={{ fontSize: 20, margin: "18px 0 8px" }}>Equipe ({pessoas.equipe.filter((p) => p.ativo).length} ativos)</h3>
       {pessoas.equipe.map((p) => linha(
@@ -2333,6 +2893,31 @@ function ListaPessoas({ pessoas, token, demo, aoMudar }) {
         () => setEditando({ tipo: "profissionais", dados: { id: p.id_profissional, nome: p.nome, funcao: p.funcao, registro_conselho: p.registro_conselho || "" } }),
         () => toggle("profissionais", p.id_profissional, p.ativo)
       ))}
+
+      {desligar && (
+        <div role="dialog" aria-modal="true" aria-label="Confirmar desligamento" style={{
+          position: "fixed", inset: 0, background: "rgba(38,32,26,0.5)", display: "flex",
+          alignItems: "center", justifyContent: "center", padding: 16, zIndex: 50,
+        }}>
+          <div style={{ background: CORES.papel, borderRadius: 16, padding: 20, maxWidth: 460, width: "100%" }}>
+            <h3 style={{ fontSize: 22, margin: "0 0 10px" }}>Desligar {desligar.nome}?</h3>
+            <p style={{ fontSize: 16, margin: "0 0 8px" }}>
+              Use em caso de alta, transferência ou óbito. O banco executa o procedimento
+              <code> sp_desligar_residente</code>, que faz tudo de uma vez:
+            </p>
+            <ul style={{ fontSize: 16, margin: "0 0 12px", paddingLeft: 22 }}>
+              <li>marca o residente e a conta dele como inativos;</li>
+              <li>encerra hoje as prescrições ativas;</li>
+              <li>suspende as metas ativas do plano de cuidado.</li>
+            </ul>
+            <p style={{ fontSize: 15, color: CORES.nota, margin: "0 0 14px" }}>Nada é apagado: o prontuário continua guardado.</p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <BotaoGrande cor={CORES.alerta} onClick={() => { const i = desligar; setDesligar(null); toggle("idosos", i.id_idoso, true); }}>Desligar</BotaoGrande>
+              <BotaoGrande cor={CORES.cinza} onClick={() => setDesligar(null)}>Cancelar</BotaoGrande>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editando && (
         <div role="dialog" aria-modal="true" style={{
@@ -2356,6 +2941,22 @@ function ListaPessoas({ pessoas, token, demo, aoMudar }) {
                         background: editando.dados.grau_dependencia === g ? "#E7ECF8" : "#FFFDF4", cursor: "pointer",
                         fontFamily: "'Atkinson Hyperlegible', sans-serif",
                       }}>{g}</button>
+                  ))}
+                </div>
+                {/* Histórico gravado pelo TRIGGER trg_log_grau_dependencia (tabela log_grau_dependencia) */}
+                <div style={{ background: "#F3EEE0", borderRadius: 12, padding: "10px 12px", marginBottom: 12 }}>
+                  <b style={{ fontSize: 15 }}>📜 Histórico do grau de dependência</b>
+                  {!historico && <p style={{ fontSize: 14, margin: "6px 0 0", color: CORES.nota }}>Carregando…</p>}
+                  {historico && historico.length === 0 && (
+                    <p style={{ fontSize: 14, margin: "6px 0 0", color: CORES.nota }}>
+                      Nenhuma mudança registrada. Ao salvar um grau diferente, o banco grava aqui (trigger).
+                    </p>
+                  )}
+                  {historico && historico.map((h) => (
+                    <p key={h.id_log} style={{ fontSize: 14, margin: "6px 0 0" }}>
+                      {horaData(h.data_hora)} · <b>{h.grau_anterior} → {h.grau_novo}</b> por {h.alterado_por}
+                      <span style={{ color: CORES.nota }}> · a ILPI passou a precisar de {h.cuidadores_necessarios} cuidador(es) por turno</span>
+                    </p>
                   ))}
                 </div>
               </>
@@ -3608,7 +4209,7 @@ function SinaisVitais({ id_idoso, token, demo }) {
         { data_hora: new Date(Date.now()-25*864e5).toISOString(), pressao_sis:145, pressao_dia:92, freq_cardiaca:78, peso_kg:68.0, glicemia:110 },
         { data_hora: new Date(Date.now()-18*864e5).toISOString(), pressao_sis:150, pressao_dia:95, freq_cardiaca:82, peso_kg:67.5, glicemia:128 },
         { data_hora: new Date(Date.now()-11*864e5).toISOString(), pressao_sis:138, pressao_dia:88, freq_cardiaca:76, peso_kg:67.0, glicemia:105 },
-        { data_hora: new Date(Date.now()-4*864e5).toISOString(), pressao_sis:132, pressao_dia:85, freq_cardiaca:74, peso_kg:66.8, glicemia:98 },
+        { data_hora: new Date(Date.now()-4*864e5).toISOString(), pressao_sis:132, pressao_dia:85, freq_cardiaca:74, peso_kg:66.8, glicemia:98, classificacao_pa: "Pré-hipertensão" },
       ],
     });
     else api(`/idosos/${id_idoso}/sinais`, { token }).then(setDados).catch(() => setDados({ registros: [], faixas: {} }));
@@ -3617,14 +4218,29 @@ function SinaisVitais({ id_idoso, token, demo }) {
   if (!dados.registros.length) return <p style={{ fontSize: 15, color: CORES.nota }}>Nenhum sinal vital registrado ainda.</p>;
   const R = dados.registros, F = dados.faixas;
   const serie = (k) => R.map((r) => ({ v: r[k] != null ? Number(r[k]) : null }));
+  // Última pressão aferida e a classificação calculada no banco pela
+  // função fn_classificar_pressao (Etapa 05)
+  const ultPa = [...R].reverse().find((r) => r.pressao_sis != null && r.pressao_dia != null);
+  const classePa = ultPa && (ultPa.classificacao_pa || null);
+  const paAlerta = classePa && /estágio|Hipotensão/.test(classePa);
   return (
     <div style={{ marginTop: 10 }}>
+      {ultPa && (
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap",
+          background: paAlerta ? CORES.alertaFundo : CORES.verdeFundo, borderRadius: 10, padding: "8px 12px", marginBottom: 10,
+        }}>
+          <span style={{ fontSize: 16 }}>Última pressão: <b>{ultPa.pressao_sis}/{ultPa.pressao_dia}</b></span>
+          {classePa && <b style={{ fontSize: 16, color: paAlerta ? CORES.alerta : CORES.verde }}>{classePa}</b>}
+        </div>
+      )}
       <LinhaVital titulo="Pressão sistólica" unidade="" pontos={serie("pressao_sis")} faixa={F.pressao_sis} cor="#B3402A" />
       <LinhaVital titulo="Freq. cardíaca" unidade=" bpm" pontos={serie("freq_cardiaca")} faixa={F.freq_cardiaca} cor="#27418F" />
       <LinhaVital titulo="Peso" unidade=" kg" pontos={serie("peso_kg")} cor="#2E7D46" />
       <LinhaVital titulo="Glicemia" unidade=" mg/dL" pontos={serie("glicemia")} faixa={F.glicemia} cor="#8A6D1A" />
       <p style={{ fontSize: 13, color: CORES.nota, margin: "4px 0 0" }}>
         A faixa verde é o intervalo de referência. Pontos vermelhos estão fora dela — sinal para a equipe conferir.
+        A classificação da pressão segue a Diretriz Brasileira de Hipertensão. Valores muito fora da faixa geram um alerta automático na passagem de plantão.
       </p>
     </div>
   );
@@ -4146,10 +4762,25 @@ function PlantaoEquipe({ token, demo, painel }) {
     if (demo) return carregar();
     try { await api(`/plantao/${id}/resolvido`, { metodo: "POST", token, corpo: { resolvido: r } }); carregar(); } catch {}
   }
+  // CRUD do recado: editar e excluir (só quem escreveu)
+  const [editando, setEditando] = useState(null); // { id_recado, texto, prioridade }
+  async function salvarEdicao() {
+    if (!editando.texto.trim()) return setMsg("O recado não pode ficar vazio.");
+    if (demo) { setEditando(null); return setMsg("✓ (demonstração) Recado editado."); }
+    try {
+      await api(`/plantao/${editando.id_recado}`, { metodo: "PATCH", token, corpo: { texto: editando.texto, prioridade: editando.prioridade } });
+      setEditando(null); setMsg("✓ Recado atualizado."); carregar();
+    } catch (e) { setMsg(`Não deu (${e.message}).`); }
+  }
+  async function excluir(id) {
+    if (demo) return setMsg("✓ (demonstração) Recado excluído.");
+    try { await api(`/plantao/${id}`, { metodo: "DELETE", token }); setMsg("✓ Recado excluído."); carregar(); }
+    catch (e) { setMsg(`Não deu (${e.message}).`); }
+  }
 
   if (!lista) return <Cartao>Carregando o plantão…</Cartao>;
-  const btn = (txt, onClick, cor) => (
-    <button onClick={onClick} style={{
+  const btn = (txt, onClick, cor, rotulo) => (
+    <button onClick={onClick} aria-label={rotulo} style={{
       fontSize: 15, fontWeight: 700, padding: "8px 12px", borderRadius: 10, minHeight: 44, cursor: "pointer",
       border: `2px solid ${cor}`, background: "#FFFDF4", color: cor, fontFamily: "'Atkinson Hyperlegible', sans-serif",
     }}>{txt}</button>
@@ -4209,10 +4840,39 @@ function PlantaoEquipe({ token, demo, painel }) {
               <b style={{ fontSize: 15, color: p.cor }}>{p.emoji} {p.r}{r.idoso ? ` · ${r.idoso.split(" ")[0]}` : " · geral"}</b>
               <span style={{ fontSize: 13, color: CORES.nota, whiteSpace: "nowrap" }}>{TURNOS_PLANTAO.find(t=>t.v===r.turno)?.r} · {horaData(r.data_hora)}</span>
             </div>
-            <p style={{ fontSize: 17, margin: "0 0 8px" }}>{r.texto}</p>
+            {editando && editando.id_recado === r.id_recado ? (
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
+                  {Object.entries(PRIO_PLANTAO).map(([v, o]) => (
+                    <button key={v} onClick={() => setEditando({ ...editando, prioridade: v })} aria-pressed={editando.prioridade === v} style={{
+                      fontSize: 14, fontWeight: 700, padding: "6px 10px", borderRadius: 10, cursor: "pointer",
+                      border: editando.prioridade === v ? `3px solid ${o.cor}` : "2px solid #D8CFBC",
+                      background: editando.prioridade === v ? o.fundo : "#FFFDF4", color: o.cor, fontFamily: "'Atkinson Hyperlegible', sans-serif",
+                    }}>{o.emoji} {o.r}</button>
+                  ))}
+                </div>
+                <textarea aria-label="Texto do recado" value={editando.texto} rows={3}
+                  onChange={(e) => setEditando({ ...editando, texto: e.target.value })} style={{ ...campoG, marginBottom: 6 }} />
+                <div style={{ display: "flex", gap: 6 }}>
+                  {btn("Salvar", salvarEdicao, CORES.verde)}
+                  {btn("Cancelar", () => setEditando(null), CORES.cinza)}
+                </div>
+              </div>
+            ) : (
+              <p style={{ fontSize: 17, margin: "0 0 8px" }}>
+                {r.texto.startsWith("[Alerta automático]") && (
+                  <span title="Criado pelo banco (trigger) a partir dos sinais vitais" style={{
+                    fontSize: 13, fontWeight: 700, background: CORES.anil, color: "#fff", borderRadius: 6, padding: "1px 6px", marginRight: 6,
+                  }}>🤖 automático</span>
+                )}
+                {r.texto.replace(/^\[Alerta automático\]\s*/, "")}
+              </p>
+            )}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
               <span style={{ fontSize: 13, color: CORES.nota }}>por {r.autor?.split(" ")[0]} · {r.ciencias} ciente(s)</span>
               <div style={{ flex: 1 }} />
+              {r.meu && !editando && btn("✏️", () => setEditando({ id_recado: r.id_recado, texto: r.texto, prioridade: r.prioridade }), CORES.anil, "Editar recado")}
+              {r.meu && !editando && btn("🗑️", () => excluir(r.id_recado), CORES.alerta, "Excluir recado")}
               {!r.resolvido && !r.eu_ciente && btn("✓ Li", () => ciencia(r.id_recado), CORES.anil)}
               {!r.resolvido && r.eu_ciente && <span style={{ fontSize: 14, fontWeight: 700, color: CORES.verde }}>✓ você leu</span>}
               {!r.resolvido && btn("Resolver", () => resolver(r.id_recado, true), CORES.verde)}
@@ -4266,32 +4926,57 @@ function AgendaEquipe({ token, demo }) {
   }
   useEffect(() => { carregar(); }, []); // eslint-disable-line
 
+  const [editId, setEditId] = useState(null); // atividade em edição (null = criando uma nova)
+
   async function criar() {
     if (!f.nome || !f.data || !f.hora) return setMsg("Preencha nome, data e hora.");
-    if (demo) return setMsg("✓ (demonstração) Atividade criada.");
+    if (demo) return setMsg(editId ? "✓ (demonstração) Atividade atualizada." : "✓ (demonstração) Atividade criada.");
+    const corpo = { nome: f.nome, categoria: f.categoria, data_hora: new Date(`${f.data}T${f.hora}`).toISOString() };
     try {
-      await api("/atividades", { metodo: "POST", token, corpo: {
-        nome: f.nome, categoria: f.categoria, data_hora: new Date(`${f.data}T${f.hora}`).toISOString(),
-      }});
-      setMsg("✓ Atividade criada e já visível para os residentes.");
-      setF({ nome: "", categoria: "social", data: "", hora: "" });
+      if (editId) {
+        await api(`/atividades/${editId}`, { metodo: "PATCH", token, corpo });
+        setMsg("✓ Atividade atualizada.");
+      } else {
+        await api("/atividades", { metodo: "POST", token, corpo });
+        setMsg("✓ Atividade criada e já visível para os residentes.");
+      }
+      setF({ nome: "", categoria: "social", data: "", hora: "" }); setEditId(null);
       carregar();
     } catch (e) { setMsg(`Não deu (${e.message}).`); }
   }
+  function editar(a) {
+    const d = new Date(a.data_hora), z = (n) => String(n).padStart(2, "0");
+    setEditId(a.id_atividade); setMsg("");
+    setF({ nome: a.nome, categoria: a.categoria,
+           data: `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`, hora: `${z(d.getHours())}:${z(d.getMinutes())}` });
+  }
+  async function excluir(a) {
+    if (demo) return setMsg("✓ (demonstração) Atividade excluída.");
+    try { await api(`/atividades/${a.id_atividade}`, { metodo: "DELETE", token }); setMsg("✓ Atividade excluída."); carregar(); }
+    catch (e) { setMsg(e.message); }
+  }
+  const mini = (txt, rotulo, cor, onClick) => (
+    <button onClick={onClick} aria-label={rotulo} style={{
+      minHeight: 40, minWidth: 40, fontSize: 15, borderRadius: 10, cursor: "pointer",
+      border: `2px solid ${cor}`, background: "#FFFDF4", color: cor, fontFamily: "'Atkinson Hyperlegible', sans-serif",
+    }}>{txt}</button>
+  );
 
   return (
     <Cartao>
-      {lista && lista.slice(0, 4).map((a) => {
+      {lista && lista.slice(0, 6).map((a) => {
         const cat = CAT_ATIV[a.categoria] || { r: a.categoria, emoji: "•" };
         return (
-          <div key={a.id_atividade} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "8px 0", borderBottom: "1px solid #E4DCC9" }}>
-            <span style={{ fontSize: 16 }}>{cat.emoji} {a.nome}</span>
+          <div key={a.id_atividade} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid #E4DCC9" }}>
+            <span style={{ fontSize: 16, flex: 1 }}>{cat.emoji} {a.nome}</span>
             <span style={{ fontSize: 15, color: CORES.nota, whiteSpace: "nowrap" }}>{horaData(a.data_hora)} · {a.confirmados} conf.</span>
+            {mini("✏️", `Editar ${a.nome}`, CORES.anil, () => editar(a))}
+            {mini("🗑️", `Excluir ${a.nome}`, CORES.alerta, () => excluir(a))}
           </div>
         );
       })}
       <div style={{ marginTop: 12 }}>
-        <p style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px" }}>Nova atividade</p>
+        <p style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px" }}>{editId ? "Editar atividade" : "Nova atividade"}</p>
         <input style={campoG} placeholder="Nome (ex.: Roda de conversa)" value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })} />
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
           {Object.entries(CAT_ATIV).map(([v, o]) => (
@@ -4308,7 +4993,10 @@ function AgendaEquipe({ token, demo }) {
           <input style={{ ...campoG, marginBottom: 0 }} type="time" value={f.hora} onChange={(e) => setF({ ...f, hora: e.target.value })} />
         </div>
         {msg && <Aviso msg={msg} />}
-        <BotaoGrande onClick={criar}>Criar atividade</BotaoGrande>
+        <div style={{ display: "flex", gap: 10 }}>
+          <BotaoGrande onClick={criar}>{editId ? "Salvar alterações" : "Criar atividade"}</BotaoGrande>
+          {editId && <BotaoGrande cor={CORES.cinza} onClick={() => { setEditId(null); setF({ nome: "", categoria: "social", data: "", hora: "" }); }}>Cancelar</BotaoGrande>}
+        </div>
       </div>
     </Cartao>
   );

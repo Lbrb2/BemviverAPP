@@ -41,7 +41,7 @@ seed_ilpi.sql                    Dados de exemplo: ≥ 30 tuplas em cada tabela 
 consultas_ilpi.sql               8 consultas analíticas e de alerta (versão original)
 consultas_etapa03.sql            As 10 consultas da tela "📊 Consultas" (gerado de api/consultas.js)
 demonstracao_acoes_referenciais.sql  Mostra ON UPDATE CASCADE e ON DELETE SET NULL (com ROLLBACK)
-entregas_bd/                     Entregas da disciplina de Banco de Dados (Etapas 01 a 05)
+entregas_bd/                     Entregas da disciplina de Banco de Dados (Etapas 01 a 06)
 rls_ilpi.sql                     Papel app_user, funções auxiliares e políticas de RLS
 migracao_001_domino.sql          Tabela partida_domino + RLS (para bancos existentes)
 migracao_002_painel_pontos.sql   Pontos do pet na view do painel (para bancos existentes)
@@ -65,6 +65,7 @@ app_ilpi.jsx                     App completo: check-in e Dominó do Lar (idoso)
 api/setup_api.sql                pgcrypto, senhas demo e LOGIN do app_user
 api/server.js                    API Express com integração RLS por transação
 api/consultas.js                 SQL das consultas analíticas (fonte única: API e .sql)
+api/dashboard.js                 SQL do dashboard estatístico do gestor
 api/gerar_sql_consultas.js       Regera consultas_etapa03.sql a partir de consultas.js
 api/package.json                 Dependências (express, pg, jsonwebtoken, cors)
 ```
@@ -81,6 +82,7 @@ psql -d ilpi -f rls_ilpi.sql
 psql -d ilpi -f api/setup_api.sql
 psql -d ilpi -f entregas_bd/etapa04/etapa04_indices_e_visoes.sql
 psql -d ilpi -f entregas_bd/etapa05/etapa05_funcoes_procedimentos_triggers.sql
+psql -d ilpi -f migracao_014_etapa06.sql
 
 cd api
 npm install
@@ -165,7 +167,7 @@ O controle de medicação segue o registro exigido pela RDC 502: prescrições c
 
 ## Consultas analíticas (gestor)
 
-Na área do gestor, a aba "📊 Consultas" lista 8 perguntas — bem-estar médio por residente, quem está sem check-in, histograma da dor, evolução semanal, aceitação alimentar por grau de dependência, intercorrências por tipo e gravidade, adesão à medicação e ranking de engajamento. Cada uma é um SQL executado na hora (`GET /consultas/:id`), com gráfico (barras ou linhas), tabela do resultado, botão para ver o SQL e exportação em CSV. As consultas rodam com a identidade do gestor, então o RLS já limita tudo à ILPI dele. Os SQLs ficam em `api/consultas.js`; `node api/gerar_sql_consultas.js` regera `consultas_etapa03.sql`, garantindo que o arquivo entregue é idêntico ao que a interface executa.
+Na área do gestor, a aba **📈 Dashboard** (a primeira) reúne indicadores resumidos e 8 gráficos calculados na hora pelo banco — histograma com média, mediana, moda, variância e desvio padrão, tendência com reta de regressão, rosca por grau de dependência (clicável, vira filtro), pizza de intercorrências, radar de participação em atividades, dispersão atividades × humor com correlação de Pearson, aceitação alimentar por refeição e pressão arterial por classificação —, com filtros de período, grau e medida (`GET /dashboard`, SQLs em `api/dashboard.js`). A aba "📊 Consultas" lista as 16 consultas das Etapas 03 e 04 (inclusive as duas visões), cada uma um SQL executado na hora (`GET /consultas/:id`), com período e filtros como parâmetros, gráfico (barras, linhas ou pizza), tabela do resultado, botão para ver o SQL e exportação em CSV. A aba "🤝 Cuidadores" executa o procedimento com cursor que distribui os cuidadores de referência. Tudo roda com a identidade do gestor, então o RLS já limita os dados à ILPI dele. `node api/gerar_sql_consultas.js` regera os arquivos .sql das consultas e do dashboard a partir do código, garantindo que o que é entregue é idêntico ao que a interface executa.
 
 ## Edição e remoção (CRUD completo em duas tabelas)
 

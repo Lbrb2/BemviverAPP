@@ -38,9 +38,10 @@ psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f rls_ilpi.sql
 echo " [5/6] Preparando a API (api/setup_api.sql)..."
 psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f api/setup_api.sql
 
-echo " [6/6] Índices, visões, funções, procedimentos e triggers (Etapas 04 e 05)..."
+echo " [6/6] Índices, visões, funções, procedimentos e triggers (Etapas 04 a 06)..."
 psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f entregas_bd/etapa04/etapa04_indices_e_visoes.sql
 psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f entregas_bd/etapa05/etapa05_funcoes_procedimentos_triggers.sql
+psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f migracao_014_etapa06.sql
 
 echo ""
 echo " === Tudo pronto! ==="

@@ -16,6 +16,7 @@ import jwt from "jsonwebtoken";
 import pg from "pg";
 import PDFDocument from "pdfkit";
 import { CONSULTAS } from "./consultas.js";
+import { DASHBOARD, MEDIDAS } from "./dashboard.js";
 
 const { Pool } = pg;
 
@@ -93,6 +94,16 @@ async function comUsuario(idUsuario, fn) {
   } finally {
     client.release();
   }
+}
+
+// Coleta as mensagens RAISE NOTICE que um procedimento emite durante fn()
+// (o driver pg entrega cada uma como um evento "notice" da conexão).
+async function comAvisos(client, fn) {
+  const avisos = [];
+  const ouvir = (msg) => avisos.push(msg.message);
+  client.on("notice", ouvir);
+  try { await fn(); } finally { client.removeListener("notice", ouvir); }
+  return avisos;
 }
 
 // ---------- Middleware de autenticação ----------
@@ -493,6 +504,54 @@ app.post("/atividades/:id/confirmar", autenticar, async (req, res) => {
   }
 });
 
+// Editar atividade da agenda (equipe da ILPI)
+app.patch("/atividades/:id", autenticar, async (req, res) => {
+  const id = Number(req.params.id);
+  const { nome, categoria, data_hora } = req.body || {};
+  const CATS = ["fisica", "social", "cognitiva", "artistica", "espiritual"];
+  if (!Number.isInteger(id) || (categoria !== undefined && !CATS.includes(categoria)) || (nome !== undefined && !String(nome).trim()))
+    return res.status(400).json({ erro: `Informe nome, categoria (${CATS.join(", ")}) e/ou data_hora.` });
+  try {
+    const r = await comUsuario(req.usuario.id_usuario, async (c) => {
+      const { rows } = await c.query(
+        `UPDATE atividade_lazer SET
+           nome      = COALESCE($2, nome),
+           categoria = COALESCE($3::categoria_atividade, categoria),
+           data_hora = COALESCE($4::timestamptz, data_hora)
+         WHERE id_atividade = $1
+         RETURNING id_atividade`,
+        [id, nome ? String(nome).trim().slice(0, 120) : null, categoria || null, data_hora || null]);
+      return rows[0] || null;
+    });
+    if (!r) return res.status(404).json({ erro: "Atividade não encontrada na sua ILPI." });
+    res.json(r);
+  } catch (e) {
+    if (e.code === "22007" || e.code === "22008") return res.status(400).json({ erro: "Data/hora inválida." });
+    console.error(e); res.status(500).json({ erro: "Falha ao editar a atividade." });
+  }
+});
+
+// Excluir atividade (equipe da ILPI). Só se ninguém confirmou presença:
+// a presença já deu pontos ao Xodó e faz parte do histórico do residente.
+app.delete("/atividades/:id", autenticar, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ erro: "Identificador inválido." });
+  try {
+    const r = await comUsuario(req.usuario.id_usuario, async (c) => {
+      const { rows: p } = await c.query("SELECT count(*)::int AS n FROM participacao WHERE id_atividade = $1", [id]);
+      if (p[0].n > 0)
+        throw Object.assign(new Error(`Esta atividade já tem ${p[0].n} presença(s) confirmada(s) e fica no histórico. Edite em vez de excluir.`), { status: 409 });
+      const { rows } = await c.query("DELETE FROM atividade_lazer WHERE id_atividade = $1 RETURNING id_atividade", [id]);
+      return rows[0] || null;
+    });
+    if (!r) return res.status(404).json({ erro: "Atividade não encontrada na sua ILPI." });
+    res.json({ ok: true });
+  } catch (e) {
+    if (e.status) return res.status(e.status).json({ erro: e.message });
+    console.error(e); res.status(500).json({ erro: "Falha ao excluir a atividade." });
+  }
+});
+
 // ============================================================
 // PASSAGEM DE PLANTÃO (comunicação interna da equipe)
 // ============================================================
@@ -503,6 +562,7 @@ app.get("/plantao", autenticar, async (req, res) => {
       const { rows } = await c.query(`
         SELECT r.id_recado, r.turno, r.prioridade, r.texto, r.resolvido, r.data_hora,
                pr.nome AS autor, i.nome AS idoso,
+               (r.id_profissional = fn_meu_id_profissional()) AS meu,
                (SELECT count(*)::int FROM ciencia_plantao cp WHERE cp.id_recado = r.id_recado) AS ciencias,
                EXISTS (SELECT 1 FROM ciencia_plantao cp
                         WHERE cp.id_recado = r.id_recado AND cp.id_profissional = fn_meu_id_profissional()) AS eu_ciente
@@ -579,6 +639,44 @@ app.post("/plantao/:id/resolvido", autenticar, async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ erro: "Falha ao atualizar." }); }
 });
 
+// Editar recado (só quem escreveu): texto e prioridade
+app.patch("/plantao/:id", autenticar, async (req, res) => {
+  const id = Number(req.params.id);
+  const { texto, prioridade } = req.body || {};
+  const PRIOS = ["rotina", "atencao", "urgente"];
+  if (!Number.isInteger(id) || (texto !== undefined && !String(texto).trim()) || (prioridade !== undefined && !PRIOS.includes(prioridade)))
+    return res.status(400).json({ erro: "Informe o texto e/ou a prioridade (rotina, atencao, urgente)." });
+  try {
+    const r = await comUsuario(req.usuario.id_usuario, async (c) => {
+      const { rows } = await c.query(
+        `UPDATE recado_plantao SET
+           texto      = COALESCE($2, texto),
+           prioridade = COALESCE($3::prioridade_plantao, prioridade)
+         WHERE id_recado = $1 AND id_profissional = fn_meu_id_profissional()
+         RETURNING id_recado`,
+        [id, texto ? String(texto).trim().slice(0, 1000) : null, prioridade || null]);
+      return rows[0] || null;
+    });
+    if (!r) return res.status(404).json({ erro: "Recado não encontrado, ou não foi você quem escreveu." });
+    res.json(r);
+  } catch (e) { console.error(e); res.status(500).json({ erro: "Falha ao editar o recado." }); }
+});
+
+// Excluir recado (quem escreveu ou o gestor; o RLS confere). As ciências
+// saem junto (ON DELETE CASCADE).
+app.delete("/plantao/:id", autenticar, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ erro: "Identificador inválido." });
+  try {
+    const r = await comUsuario(req.usuario.id_usuario, async (c) => {
+      const { rows } = await c.query("DELETE FROM recado_plantao WHERE id_recado = $1 RETURNING id_recado", [id]);
+      return rows[0] || null;
+    });
+    if (!r) return res.status(404).json({ erro: "Recado não encontrado, ou não foi você quem escreveu." });
+    res.json({ ok: true });
+  } catch (e) { console.error(e); res.status(500).json({ erro: "Falha ao excluir o recado." }); }
+});
+
 // ============================================================
 // ESCALAS GUIADAS (GDS-15, Katz) — cálculo no servidor
 // ============================================================
@@ -650,7 +748,8 @@ app.get("/idosos/:id/sinais", autenticar, async (req, res) => {
     const linhas = await comUsuario(req.usuario.id_usuario, async (c) => {
       const { rows } = await c.query(
         `SELECT id_sinal, data_hora, pressao_sis, pressao_dia, freq_cardiaca,
-                temperatura, peso_kg, glicemia, saturacao, observacoes
+                temperatura, peso_kg, glicemia, saturacao, observacoes,
+                fn_classificar_pressao(pressao_sis, pressao_dia) AS classificacao_pa   -- FUNÇÃO da Etapa 05
            FROM sinal_vital WHERE id_idoso = $1 ORDER BY data_hora DESC LIMIT 60`, [id]);
       return rows;
     });
@@ -1263,8 +1362,11 @@ app.get("/gestao/pessoas", autenticar, async (req, res) => {
     const dados = await comUsuario(req.usuario.id_usuario, async (c) => {
       await exigirGestor(c);
       const { rows: idosos } = await c.query(
-        `SELECT i.id_idoso, i.id_usuario, i.nome, i.cpf, i.grau_dependencia, i.ativo, u.email
-           FROM idoso i LEFT JOIN usuario u ON u.id_usuario = i.id_usuario
+        `SELECT i.id_idoso, i.id_usuario, i.nome, i.cpf, i.grau_dependencia, i.ativo, u.email,
+                cr.nome AS cuidador_referencia
+           FROM idoso i
+           LEFT JOIN usuario u       ON u.id_usuario = i.id_usuario
+           LEFT JOIN profissional cr ON cr.id_profissional = i.id_cuidador_referencia
           WHERE i.id_ilpi = fn_minha_ilpi_profissional() ORDER BY i.ativo DESC, i.nome`);
       const { rows: equipe } = await c.query(
         `SELECT p.id_profissional, p.id_usuario, p.nome, p.funcao, p.registro_conselho, p.ativo, u.email
@@ -1393,6 +1495,10 @@ app.patch("/gestao/idosos/:id", autenticar, async (req, res) => {
 });
 
 // Ativar/desativar idoso (alta ou retorno). Desativar preserva histórico.
+// Desligar chama o PROCEDIMENTO sp_desligar_residente (Etapa 05), que na
+// mesma transação inativa o residente e a conta, encerra as prescrições
+// ativas e suspende as metas do plano de cuidado. As mensagens que o
+// procedimento emite (RAISE NOTICE) voltam para a tela.
 app.post("/gestao/idosos/:id/ativo", autenticar, async (req, res) => {
   const id = Number(req.params.id);
   const { ativo } = req.body || {};
@@ -1401,16 +1507,107 @@ app.post("/gestao/idosos/:id/ativo", autenticar, async (req, res) => {
   try {
     const r = await comUsuario(req.usuario.id_usuario, async (c) => {
       await exigirGestor(c);
-      const { rows } = await c.query("UPDATE idoso SET ativo = $2 WHERE id_idoso = $1 RETURNING id_idoso, id_usuario", [id, ativo]);
-      if (rows[0] && rows[0].id_usuario)
-        await c.query("UPDATE usuario SET ativo = $2 WHERE id_usuario = $1", [rows[0].id_usuario, ativo]);
-      return rows[0] || null;
+      const { rows } = await c.query("SELECT id_usuario, ativo FROM idoso WHERE id_idoso = $1", [id]);
+      if (!rows[0]) return null;
+      if (!ativo) {
+        if (!rows[0].ativo) return { id_idoso: id, mensagens: ["O residente já estava desligado."] };
+        const mensagens = await comAvisos(c, () => c.query("CALL sp_desligar_residente($1)", [id]));
+        return { id_idoso: id, mensagens };
+      }
+      await c.query("UPDATE idoso SET ativo = true WHERE id_idoso = $1", [id]);
+      if (rows[0].id_usuario)
+        await c.query("UPDATE usuario SET ativo = true WHERE id_usuario = $1", [rows[0].id_usuario]);
+      return { id_idoso: id, mensagens: [] };
     });
     if (!r) return res.status(404).json({ erro: "Residente não encontrado." });
-    res.json({ id_idoso: r.id_idoso, ativo });
+    res.json({ id_idoso: r.id_idoso, ativo, mensagens: r.mensagens });
   } catch (e) {
     if (e.status) return res.status(e.status).json({ erro: e.message });
+    if (e.code === "P0001") return res.status(403).json({ erro: e.message });   // RAISE EXCEPTION do procedimento
     console.error(e); res.status(500).json({ erro: "Falha ao atualizar." });
+  }
+});
+
+// Histórico de grau de dependência do residente (tabela de log gravada
+// pelo TRIGGER trg_log_grau_dependencia, Etapa 05)
+app.get("/gestao/idosos/:id/historico-grau", autenticar, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ erro: "Identificador inválido." });
+  try {
+    const linhas = await comUsuario(req.usuario.id_usuario, async (c) => {
+      await exigirGestor(c);
+      const { rows } = await c.query(
+        `SELECT l.id_log, l.grau_anterior, l.grau_novo, l.cuidadores_necessarios, l.data_hora,
+                COALESCE(p.nome, u.email, 'administrador do banco') AS alterado_por
+           FROM log_grau_dependencia l
+           LEFT JOIN usuario u      ON u.id_usuario = l.id_usuario
+           LEFT JOIN profissional p ON p.id_usuario = l.id_usuario
+          WHERE l.id_idoso = $1
+          ORDER BY l.data_hora DESC`, [id]);
+      return rows;
+    });
+    res.json(linhas);
+  } catch (e) {
+    if (e.status) return res.status(e.status).json({ erro: e.message });
+    console.error(e); res.status(500).json({ erro: "Falha ao carregar o histórico." });
+  }
+});
+
+// ---------- Cuidadores de referência (procedimento com cursor, Etapa 05) ----------
+// Situação atual: cada cuidador ativo, seus residentes e a carga em pontos
+// (grau I = 3, II = 6, III = 10), mais quem está sem referência e quantos
+// cuidadores a RDC 502 exige (FUNÇÃO fn_cuidadores_necessarios).
+app.get("/gestao/cuidadores", autenticar, async (req, res) => {
+  try {
+    const d = await comUsuario(req.usuario.id_usuario, async (c) => {
+      await exigirGestor(c);
+      const { rows: cuidadores } = await c.query(
+        `SELECT p.id_profissional, p.nome,
+                count(i.id_idoso)::int AS residentes,
+                COALESCE(sum(CASE i.grau_dependencia WHEN 'I' THEN 3 WHEN 'II' THEN 6 WHEN 'III' THEN 10 END), 0)::int
+                                       AS pontos_de_carga,
+                COALESCE(string_agg(i.nome || ' (' || i.grau_dependencia || ')', ', ' ORDER BY i.grau_dependencia DESC, i.nome), '')
+                                       AS lista
+           FROM profissional p
+           LEFT JOIN idoso i ON i.id_cuidador_referencia = p.id_profissional AND i.ativo
+          WHERE p.id_ilpi = fn_minha_ilpi_profissional()
+            AND p.funcao = 'cuidador' AND p.ativo
+          GROUP BY p.id_profissional, p.nome
+          ORDER BY pontos_de_carga DESC, p.nome`);
+      const { rows: sem } = await c.query(
+        `SELECT i.id_idoso, i.nome, i.grau_dependencia
+           FROM idoso i
+           LEFT JOIN profissional p
+                  ON p.id_profissional = i.id_cuidador_referencia AND p.ativo AND p.funcao = 'cuidador'
+          WHERE i.id_ilpi = fn_minha_ilpi_profissional() AND i.ativo AND p.id_profissional IS NULL
+          ORDER BY i.grau_dependencia DESC, i.nome`);
+      const { rows: n } = await c.query(
+        "SELECT fn_cuidadores_necessarios(fn_minha_ilpi_profissional()) AS necessarios");
+      return { cuidadores, sem_referencia: sem, necessarios: n[0].necessarios };
+    });
+    res.json(d);
+  } catch (e) {
+    if (e.status) return res.status(e.status).json({ erro: e.message });
+    console.error(e); res.status(500).json({ erro: "Falha ao carregar os cuidadores." });
+  }
+});
+
+// Executa o PROCEDIMENTO sp_distribuir_cuidadores. refazer = true apaga a
+// divisão atual e distribui todos de novo; false só atribui quem está sem
+// referência. Devolve as mensagens do procedimento (uma por residente).
+app.post("/gestao/cuidadores/distribuir", autenticar, async (req, res) => {
+  const refazer = (req.body || {}).refazer === true;
+  try {
+    const mensagens = await comUsuario(req.usuario.id_usuario, async (c) => {
+      await exigirGestor(c);
+      return comAvisos(c, () =>
+        c.query("CALL sp_distribuir_cuidadores(fn_minha_ilpi_profissional(), $1)", [refazer]));
+    });
+    res.json({ mensagens });
+  } catch (e) {
+    if (e.status) return res.status(e.status).json({ erro: e.message });
+    if (e.code === "P0001") return res.status(409).json({ erro: e.message });
+    console.error(e); res.status(500).json({ erro: "Falha ao distribuir." });
   }
 });
 
@@ -1459,12 +1656,25 @@ app.post("/gestao/profissionais/:id/ativo", autenticar, async (req, res) => {
         if (eu[0] && eu[0].funcao === "gestor" && g[0].n === 0)
           throw Object.assign(new Error("Não é possível desativar o único gestor ativo da ILPI."), { status: 409 });
       }
-      const { rows } = await c.query("UPDATE profissional SET ativo = $2 WHERE id_profissional = $1 RETURNING id_usuario", [id, ativo]);
-      if (rows[0]) await c.query("UPDATE usuario SET ativo = $2 WHERE id_usuario = $1", [rows[0].id_usuario, ativo]);
-      return rows[0] || null;
+      const { rows } = await c.query("UPDATE profissional SET ativo = $2 WHERE id_profissional = $1 RETURNING id_usuario, funcao", [id, ativo]);
+      if (!rows[0]) return null;
+      await c.query("UPDATE usuario SET ativo = $2 WHERE id_usuario = $1", [rows[0].id_usuario, ativo]);
+      // Cuidador saiu da equipe: os residentes de quem ele era referência
+      // são redistribuídos na hora pelo PROCEDIMENTO com cursor (refazer =
+      // false: só quem ficou sem referência), se ainda houver cuidador ativo.
+      let mensagens = [];
+      if (!ativo && rows[0].funcao === "cuidador") {
+        const { rows: x } = await c.query(
+          `SELECT EXISTS (SELECT 1 FROM idoso WHERE id_cuidador_referencia = $1 AND ativo) AS tinha,
+                  EXISTS (SELECT 1 FROM profissional WHERE id_ilpi = $2 AND funcao = 'cuidador' AND ativo) AS ha_outro`,
+          [id, ilpi]);
+        if (x[0].tinha && x[0].ha_outro)
+          mensagens = await comAvisos(c, () => c.query("CALL sp_distribuir_cuidadores($1, false)", [ilpi]));
+      }
+      return { mensagens };
     });
     if (!r) return res.status(404).json({ erro: "Profissional não encontrado." });
-    res.json({ id_profissional: id, ativo });
+    res.json({ id_profissional: id, ativo, mensagens: r.mensagens });
   } catch (e) {
     if (e.status) return res.status(e.status).json({ erro: e.message });
     console.error(e); res.status(500).json({ erro: "Falha ao atualizar." });
@@ -1623,35 +1833,107 @@ app.get("/alertas/checkins", autenticar, async (req, res) => {
 });
 
 // ============================================================
+// DASHBOARD ESTATÍSTICO (gestor) — os SQLs ficam em dashboard.js
+// Todos os blocos são calculados no banco, agora, com o RLS da ILPI.
+// ============================================================
+const DIAS_DASHBOARD = [7, 30, 90, 180];
+const GRAUS = ["todos", "I", "II", "III"];
+
+app.get("/dashboard", autenticar, async (req, res) => {
+  const dias = req.query.dias === undefined ? 30 : Number(req.query.dias);
+  const grau = req.query.grau === undefined ? "todos" : String(req.query.grau);
+  const medida = req.query.medida === undefined ? "humor" : String(req.query.medida);
+  if (!DIAS_DASHBOARD.includes(dias)) return res.status(400).json({ erro: `Período inválido. Use ${DIAS_DASHBOARD.join(", ")} dias.` });
+  if (!GRAUS.includes(grau)) return res.status(400).json({ erro: "Grau inválido. Use todos, I, II ou III." });
+  if (!MEDIDAS[medida]) return res.status(400).json({ erro: "Medida inválida. Use humor, conforto ou dor." });
+  const p = [dias, grau];
+  // bloco -> [SQL, parâmetros]
+  const blocos = {
+    indicadores:          [DASHBOARD.indicadores, p],
+    adesao:               [DASHBOARD.adesao, [grau]],
+    estatisticas:         [DASHBOARD.estatisticas[medida], p],
+    histograma:           [DASHBOARD.histograma[medida], p],
+    tendencia:            [DASHBOARD.tendencia, p],
+    regressao:            [DASHBOARD.regressao, p],
+    intercorrencias_tipo: [DASHBOARD.intercorrencias_tipo, p],
+    residentes_grau:      [DASHBOARD.residentes_grau, []],
+    radar_atividades:     [DASHBOARD.radar_atividades, p],
+    dispersao:            [DASHBOARD.dispersao, p],
+    correlacao:           [DASHBOARD.correlacao, p],
+    refeicoes:            [DASHBOARD.refeicoes, p],
+    pressao:              [DASHBOARD.pressao, p],
+  };
+  try {
+    const dados = await comUsuario(req.usuario.id_usuario, async (c) => {
+      await exigirGestor(c);
+      const r = {};
+      // uma consulta de cada vez na mesma conexão (mesma transação)
+      for (const [nome, [sql, params]] of Object.entries(blocos))
+        r[nome] = (await c.query(sql, params)).rows;
+      return r;
+    });
+    res.json({
+      filtros: { dias, grau, medida, opcoes_dias: DIAS_DASHBOARD, medidas: MEDIDAS },
+      indicadores: { ...dados.indicadores[0], ...dados.adesao[0] },
+      estatisticas: dados.estatisticas[0],
+      histograma: dados.histograma,
+      tendencia: dados.tendencia,
+      regressao: dados.regressao[0],
+      intercorrencias_tipo: dados.intercorrencias_tipo,
+      residentes_grau: dados.residentes_grau,
+      radar_atividades: dados.radar_atividades,
+      dispersao: dados.dispersao,
+      correlacao: dados.correlacao[0],
+      refeicoes: dados.refeicoes,
+      pressao: dados.pressao,
+      sql: Object.fromEntries(Object.entries(blocos).map(([k, [q]]) => [k, q])),
+    });
+  } catch (e) {
+    if (e.status) return res.status(e.status).json({ erro: e.message });
+    console.error(e); res.status(500).json({ erro: "Falha ao montar o dashboard." });
+  }
+});
+
+// ============================================================
 // CONSULTAS ANALÍTICAS (tela "📊 Consultas" do gestor)
 // Os SQLs vivem em consultas.js. Rodam com a identidade do usuário,
 // então o RLS limita o resultado à ILPI de quem pediu.
 // ============================================================
 app.get("/consultas", autenticar, (req, res) => {
-  res.json(CONSULTAS.map(({ id, titulo, pergunta, tecnicas, grafico, periodo }) =>
-    ({ id, titulo, pergunta, tecnicas, grafico, periodo: periodo || null })));
+  res.json(CONSULTAS.map(({ id, etapa, visao, titulo, pergunta, tecnicas, grafico, periodo, filtro }) =>
+    ({ id, etapa: etapa || 3, visao: !!visao, titulo, pergunta, tecnicas, grafico,
+       periodo: periodo || null, filtro: filtro || null })));
 });
 
 app.get("/consultas/:id", autenticar, async (req, res) => {
   const def = CONSULTAS.find((c) => c.id === Number(req.params.id));
   if (!def) return res.status(404).json({ erro: "Consulta não encontrada." });
-  // período em dias ($1): só os valores oferecidos pela consulta; sem ?dias, o padrão
-  let params = [];
+  // Parâmetros, na ordem: período em dias ($1) e/ou filtro ($1 ou $2).
+  // Só valem os valores oferecidos pela consulta; sem nada na URL, o padrão.
+  const params = [];
+  let dias = null, filtro = null;
   if (def.periodo) {
-    const dias = req.query.dias === undefined ? def.periodo.padrao : Number(req.query.dias);
+    dias = req.query.dias === undefined ? def.periodo.padrao : Number(req.query.dias);
     if (!def.periodo.opcoes.includes(dias))
       return res.status(400).json({ erro: `Período inválido. Use ${def.periodo.opcoes.join(", ")} dias.` });
-    params = [dias];
+    params.push(dias);
+  }
+  if (def.filtro) {
+    filtro = req.query.filtro === undefined ? def.filtro.padrao : String(req.query.filtro);
+    if (!def.filtro.opcoes.some(([v]) => v === filtro))
+      return res.status(400).json({ erro: "Filtro inválido." });
+    params.push(filtro);
   }
   try {
     const r = await comUsuario(req.usuario.id_usuario, async (c) => {
       const { rows } = await c.query("SELECT fn_sou_gestor() AS ok");
       if (!rows[0].ok) throw Object.assign(new Error("As consultas analíticas são do gestor da ILPI."), { status: 403 });
-      return c.query(def.sql, params);   // SQL explícito; o período vai como parâmetro $1
+      return c.query(def.sql, params);   // SQL explícito; período e filtro vão como parâmetros
     });
     res.json({
-      id: def.id, titulo: def.titulo, sql: def.sql, grafico: def.grafico,
-      periodo: def.periodo ? { ...def.periodo, dias: params[0] } : null,
+      id: def.id, etapa: def.etapa || 3, visao: !!def.visao, titulo: def.titulo, sql: def.sql, grafico: def.grafico,
+      periodo: def.periodo ? { ...def.periodo, dias } : null,
+      filtro: def.filtro ? { ...def.filtro, valor: filtro } : null,
       colunas: r.fields.map((f) => f.name), linhas: r.rows,
     });
   } catch (e) {

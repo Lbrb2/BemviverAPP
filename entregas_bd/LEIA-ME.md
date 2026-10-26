@@ -78,6 +78,8 @@ psql -U postgres -d ilpi -f etapa04/etapa04_consultas.sql
 | 2 consultas com subconsultas | Consulta 13: dor acima da média da própria ILPI (subconsulta correlacionada no SELECT e no HAVING). Consulta 14: agenda de revisão do plano de cuidado (subconsultas escalares + IN) |
 | 2 visões com pelo menos 3 joins e justificativa | `vw_mapa_medicacao` (5 tabelas: prescrição, residente, ILPI, prescritor, administrações) e `vw_intercorrencia_contato` (6 tabelas: intercorrência, residente, ILPI, profissional, vínculo e responsável legal). A justificativa está no comentário acima de cada uma |
 
+As mesmas consultas e visões aparecem na aba **📊 Consultas** do gestor (com período e filtro escolhidos na tela). O SQL exato que a interface executa, com os parâmetros, está em `etapa04/etapa04_consultas_na_interface.sql` (gerado de `api/consultas.js`).
+
 ## Etapa 05 — Funções, procedimentos e triggers
 
 ```
@@ -97,3 +99,19 @@ O primeiro arquivo cria os objetos (o instalador já roda); o segundo testa cada
 | Trigger que atualiza tabela de log | `trg_log_grau_dependencia` → `log_grau_dependencia` | Guarda cada mudança de grau de dependência: grau anterior, novo, quem mudou, quando e quantos cuidadores a ILPI passou a precisar |
 
 Para o procedimento com cursor, o residente ganhou a coluna `id_cuidador_referencia` (cuidador de referência). Os dois triggers já funcionam pela aplicação atual: registrar sinais vitais alterados faz o alerta aparecer na tela do plantão, e o gestor mudar o grau de um residente grava o log.
+
+## Etapa 06 — Interface funcional com dashboard (versão final)
+
+Instalação igual à da Etapa 03 (`instalar_windows.bat` → `iniciar_api_windows.bat` → `iniciar_app_windows.bat`); o instalador já aplica as Etapas 04 e 05 e a `migracao_014_etapa06.sql`. Senha de todas as contas: `demo123`. Backend em Node.js (liberado pelo professor), sem ORM: todo comando é SQL escrito no código e enviado ao banco com parâmetros.
+
+| O que o enunciado pede | Onde ver |
+|---|---|
+| CRUD em pelo menos 4 tabelas | **recado_mural** (responsável `mariana.filha@email.com`: enviar, ✏️ editar, 🗑️ apagar recado) · **restricao_alimentar** (`enf.patricia@larpaz.com` → 🍎 Nutrição: adicionar, renomear, remover) · **recado_plantao** (`enf.patricia@larpaz.com` → Passagem de plantão: + Recado, ✏️ editar e 🗑️ excluir os seus) · **atividade_lazer** (equipe → Agenda: criar, ✏️ editar, 🗑️ excluir atividade sem presenças). Além disso, idoso e profissional têm cadastro, edição e desligamento na aba 👥 Pessoas do gestor |
+| Executar ou ver os efeitos de funções, procedimentos e triggers | `fn_classificar_pressao`: classificação da última pressão nos sinais vitais do residente e gráfico 8 do dashboard · `fn_cuidadores_necessarios`: indicador "Cuidadores por turno (RDC 502)" e aba 🤝 Cuidadores · `sp_desligar_residente`: botão Desativar de um residente (aba 👥 Pessoas), com a explicação e as mensagens do procedimento · `sp_distribuir_cuidadores` (cursor): aba 🤝 Cuidadores, botões de distribuir/refazer, com o passo a passo devolvido pelo banco; também roda sozinho quando um cuidador é desativado · `trg_alerta_sinal_vital`: registrar sinais muito alterados gera o recado "🤖 automático" no plantão · `trg_log_grau_dependencia`: ✏️ editar residente mostra o histórico do grau |
+| Consultas e visões das Etapas 03 e 04 na interface, com filtros/parâmetros | aba **📊 Consultas** (gestor): as 10 da Etapa 03 e as 6 da Etapa 04 (consultas 11–14 e as visões 15–16), com período e filtros (grau, categoria da meta, prescrições abaixo do previsto, família não avisada), gráfico (barras, linhas ou pizza), tabela, "Ver o SQL" e CSV |
+| Dashboard estatístico com dados do banco | aba **📈 Dashboard** (gestor `gestor@larpaz.com`, abre por padrão) |
+| Indicadores resumidos | residentes, check-ins, % com check-in, humor e dor médios com a variação em relação ao período anterior, intercorrências (com variação), adesão à medicação, aceitação alimentar e cuidadores na equipe × exigidos |
+| Pelo menos 6 gráficos dinâmicos | 8 gráficos: (1) histograma com média, mediana, moda, variância, desvio padrão e coeficiente de variação; (2) tendência no tempo com reta de regressão (`regr_slope`); (3) rosca de residentes por grau; (4) pizza de intercorrências por tipo; (5) radar de participação por categoria de atividade, atual × anterior; (6) dispersão atividades × humor com correlação de Pearson (`corr`) e reta de regressão; (7) colunas de aceitação alimentar por refeição; (8) barras da pressão arterial por classificação |
+| Visualizações interativas com filtros | período (7, 30, 90, 180 dias), grau de dependência (botões ou clicando na fatia da rosca) e medida analisada (humor, conforto, dor). Cada gráfico tem o botão "🧾 SQL" com o comando que o gerou |
+
+Todos os cálculos estatísticos são feitos pelo PostgreSQL (`avg`, `percentile_cont`, `mode()`, `var_samp`, `stddev_samp`, `corr`, `regr_slope`, `regr_intercept`, `regr_r2`). Os SQLs ficam em `api/dashboard.js`; o arquivo `etapa06/etapa06_sql_dashboard.sql` traz os mesmos comandos prontos para rodar no psql/pgAdmin.
