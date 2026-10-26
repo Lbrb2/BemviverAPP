@@ -76,9 +76,24 @@ INSERT INTO avaliacao (id_avaliacao, id_idoso, id_profissional, instrumento, dat
  (4, 2, 1, 'KATZ',  now() - INTERVAL '60 days', 6, 'Totalmente independente'),
  (5, 3, 1, 'ICOPE', now() - INTERVAL '15 days', NULL, 'Triagem ICOPE: declínio em mobilidade e cognição');
 
+-- GDS-15 da avaliação 3: as 15 perguntas; "pontuacao" = 1 quando a resposta
+-- indica sintoma depressivo. A soma (6) é o pontuacao_total da avaliação.
 INSERT INTO item_avaliacao (id_avaliacao, dominio, resposta, pontuacao) VALUES
- (3, 'humor',      'Sente-se triste com frequência',        1),
- (3, 'humor',      'Abandonou muitas atividades',           1),
+ (3, 'Está satisfeita com sua vida?',                              'Sim', 0),
+ (3, 'Abandonou muitos de seus interesses e atividades?',          'Sim', 1),
+ (3, 'Acha que sua vida está vazia?',                              'Não', 0),
+ (3, 'Sente-se aborrecida com frequência?',                        'Sim', 1),
+ (3, 'Está de bom humor na maior parte do tempo?',                 'Sim', 0),
+ (3, 'Tem medo que algo ruim lhe aconteça?',                       'Sim', 1),
+ (3, 'Sente-se feliz na maior parte do tempo?',                    'Sim', 0),
+ (3, 'Sente-se desamparada com frequência?',                       'Sim', 1),
+ (3, 'Prefere ficar em casa a sair e fazer coisas novas?',         'Sim', 1),
+ (3, 'Acha que tem mais problemas de memória que outras pessoas?', 'Não', 0),
+ (3, 'Acha que é maravilhoso estar viva agora?',                   'Sim', 0),
+ (3, 'Sente-se inútil do jeito que está?',                         'Não', 0),
+ (3, 'Sente-se cheia de energia?',                                 'Não', 1),
+ (3, 'Acha que sua situação não tem esperança?',                   'Não', 0),
+ (3, 'Acha que a maioria das pessoas está melhor que a senhora?',  'Não', 0),
  (5, 'mobilidade', 'Não conseguiu levantar da cadeira 5x',  0),
  (5, 'cognicao',   'Dificuldade em lembrar 3 palavras',     0),
  (5, 'nutricao',   'Sem perda de peso relevante',           1);
@@ -122,7 +137,8 @@ INSERT INTO participacao (id_idoso, id_atividade, nivel_engajamento) VALUES
  (4, 4, 3);
 
 -- ---------- Pets virtuais e eventos ----------
--- nivel é coluna gerada (1 + pontos / 100): Xodó fica no nível 3, Fubá no 2
+-- nivel é coluna gerada (1 + pontos / 100). Os pontos são recalculados no fim
+-- do arquivo como a soma dos eventos do pet (como faz a aplicação).
 INSERT INTO pet_virtual (id_pet, id_idoso, nome, especie, pontos) VALUES
  (1, 1, 'Xodó',    'passarinho', 260),
  (2, 2, 'Fubá',    'gato',       140);
@@ -3498,6 +3514,12 @@ INSERT INTO evento_pet (id_pet, origem, pontos_ganhos, data_hora) VALUES
  (4, 'partida_jogo', 30, now() - INTERVAL '19 days 9 hours'),
  (11, 'partida_jogo', 30, now() - INTERVAL '1 days 9 hours');
 
+-- ---------- Pontos do Xodó = soma dos eventos ----------
+-- O pet começa com 0 ponto e cada evento soma pontos_ganhos (é o que a
+-- função fn_pontuar_pet faz na aplicação). Aqui o saldo é recalculado a
+-- partir do histórico, para pontos e eventos baterem sempre.
+UPDATE pet_virtual pv
+   SET pontos = COALESCE((SELECT sum(e.pontos_ganhos) FROM evento_pet e WHERE e.id_pet = pv.id_pet), 0);
 -- ============================================================
 -- Conferência: aborta a carga se alguma tabela ficar com < 30 tuplas
 -- ============================================================
