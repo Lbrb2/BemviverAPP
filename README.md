@@ -41,7 +41,7 @@ seed_ilpi.sql                    Dados de exemplo: ≥ 30 tuplas em cada tabela 
 consultas_ilpi.sql               8 consultas analíticas e de alerta (versão original)
 consultas_etapa03.sql            As 10 consultas da tela "📊 Consultas" (gerado de api/consultas.js)
 demonstracao_acoes_referenciais.sql  Mostra ON UPDATE CASCADE e ON DELETE SET NULL (com ROLLBACK)
-entregas_bd/                     Entregas da disciplina de Banco de Dados (Etapas 01, 02 e 03)
+entregas_bd/                     Entregas da disciplina de Banco de Dados (Etapas 01 a 05)
 rls_ilpi.sql                     Papel app_user, funções auxiliares e políticas de RLS
 migracao_001_domino.sql          Tabela partida_domino + RLS (para bancos existentes)
 migracao_002_painel_pontos.sql   Pontos do pet na view do painel (para bancos existentes)
@@ -79,6 +79,8 @@ psql -d ilpi -f schema_ilpi.sql
 psql -d ilpi -f seed_ilpi.sql
 psql -d ilpi -f rls_ilpi.sql
 psql -d ilpi -f api/setup_api.sql
+psql -d ilpi -f entregas_bd/etapa04/etapa04_indices_e_visoes.sql
+psql -d ilpi -f entregas_bd/etapa05/etapa05_funcoes_procedimentos_triggers.sql
 
 cd api
 npm install

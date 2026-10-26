@@ -64,6 +64,8 @@ Render e Vercel puxam o código do GitHub. Se ainda não tem o projeto lá:
    2. `seed_ilpi.sql` (dados de demonstração)
    3. `rls_ilpi.sql` (segurança + papel app_user)
    4. `api/setup_api.sql` (ajustes da API)
+   5. `entregas_bd/etapa04/etapa04_indices_e_visoes.sql` (índices e visões)
+   6. `entregas_bd/etapa05/etapa05_funcoes_procedimentos_triggers.sql` (funções, procedimentos e triggers)
 
    > No `rls_ilpi.sql` há uma linha `CREATE ROLE app_user NOLOGIN;`. Para a
    > nuvem, o app_user precisa poder logar. Depois de rodar tudo, execute:

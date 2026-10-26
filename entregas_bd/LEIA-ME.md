@@ -60,3 +60,40 @@ const { rows } = await c.query(
    VALUES ($1, $2, $3, $4, $5) RETURNING id_partida_jogo`,
   [eu[0].id, jogo, resultado, inteiroOuNulo(pontuacao), inteiroOuNulo(jogadas)]);
 ```
+
+## Etapa 04 — Consultas avançadas, visões e índices
+
+Rodar num banco já instalado (o `instalar_*` faz isso sozinho, no passo 6):
+
+```
+psql -U postgres -d ilpi -f etapa04/etapa04_indices_e_visoes.sql
+psql -U postgres -d ilpi -f etapa04/etapa04_consultas.sql
+```
+
+| O que o enunciado pede | Onde está |
+|---|---|
+| 2 índices novos, usados nas consultas/visões | `ix_intercorrencia_data` (intercorrências por período, sem filtrar residente — usado na consulta 12 e na visão 2) e `ix_meta_ativa_revisao` (índice parcial só das metas ativas, por data de revisão — usado na consulta 14). O final de `etapa04_consultas.sql` mostra os dois no `EXPLAIN` |
+| 1 consulta com anti join | Consulta 11: residentes sem aferição de sinais vitais em 7 dias (`LEFT JOIN ... WHERE s.id_sinal IS NULL`) |
+| 1 consulta com full outer join | Consulta 12: intercorrências × recados de plantão por residente (mostra as falhas de comunicação entre turnos) |
+| 2 consultas com subconsultas | Consulta 13: dor acima da média da própria ILPI (subconsulta correlacionada no SELECT e no HAVING). Consulta 14: agenda de revisão do plano de cuidado (subconsultas escalares + IN) |
+| 2 visões com pelo menos 3 joins e justificativa | `vw_mapa_medicacao` (5 tabelas: prescrição, residente, ILPI, prescritor, administrações) e `vw_intercorrencia_contato` (6 tabelas: intercorrência, residente, ILPI, profissional, vínculo e responsável legal). A justificativa está no comentário acima de cada uma |
+
+## Etapa 05 — Funções, procedimentos e triggers
+
+```
+psql -U postgres -d ilpi -f etapa05/etapa05_funcoes_procedimentos_triggers.sql
+psql -U postgres -d ilpi -f etapa05/etapa05_demonstracao.sql
+```
+
+O primeiro arquivo cria os objetos (o instalador já roda); o segundo testa cada um entre `BEGIN` e `ROLLBACK`, então pode ser executado várias vezes sem alterar os dados.
+
+| O que o enunciado pede | Objeto | Para que serve |
+|---|---|---|
+| Função com estrutura condicional | `fn_classificar_pressao(sis, dia)` | Classifica a pressão pelas faixas da Diretriz Brasileira de Hipertensão (IF/ELSIF) |
+| Segunda função | `fn_cuidadores_necessarios(id_ilpi)` | Quantos cuidadores por turno a ILPI precisa, pelas proporções da RDC 502/2021 (1 para 20, 10 ou 6 residentes, conforme o grau) |
+| Procedimento de atualização | `sp_desligar_residente(id_idoso)` | Alta/óbito: inativa o residente e a conta, encerra as prescrições ativas e suspende as metas, tudo na mesma transação |
+| Procedimento com cursor | `sp_distribuir_cuidadores(id_ilpi, refazer)` | Distribui os residentes entre os cuidadores pela carga de trabalho (grau I = 3, II = 6, III = 10 pontos). Precisa de cursor porque cada escolha depende das anteriores; a demonstração mostra que um UPDATE único mandaria todos para o mesmo cuidador |
+| Trigger | `trg_alerta_sinal_vital` | Depois de cada aferição, se algum sinal estiver fora da faixa, cria sozinho um recado urgente/atenção na passagem de plantão |
+| Trigger que atualiza tabela de log | `trg_log_grau_dependencia` → `log_grau_dependencia` | Guarda cada mudança de grau de dependência: grau anterior, novo, quem mudou, quando e quantos cuidadores a ILPI passou a precisar |
+
+Para o procedimento com cursor, o residente ganhou a coluna `id_cuidador_referencia` (cuidador de referência). Os dois triggers já funcionam pela aplicação atual: registrar sinais vitais alterados faz o alerta aparecer na tela do plantão, e o gestor mudar o grau de um residente grava o log.
