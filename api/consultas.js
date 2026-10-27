@@ -12,9 +12,18 @@
 // está logado. Rodadas como superusuário no psql, mostram todas as ILPIs.
 // ============================================================
 
+// Grupos da tela, na ordem em que aparecem
+export const GRUPOS = [
+  ["bem_estar", "Bem-estar"],
+  ["saude", "Saúde e medicação"],
+  ["ocorrencias", "Ocorrências e comunicação"],
+  ["rotina", "Rotina, convivência e plano de cuidado"],
+];
+
 export const CONSULTAS = [
   {
     id: 1,
+    grupo: "bem_estar",
     titulo: "Bem-estar médio por residente",
     pergunta: "Como cada residente tem se sentido no período?",
     tecnicas: ["INNER JOIN", "GROUP BY", "AVG", "STDDEV_SAMP", "parâmetro $1"],
@@ -35,7 +44,8 @@ export const CONSULTAS = [
   },
   {
     id: 2,
-    titulo: "Alerta: residentes sem check-in há mais de 3 dias",
+    grupo: "bem_estar",
+    titulo: "Residentes sem check-in há mais de 3 dias",
     pergunta: "Quem a equipe precisa procurar hoje?",
     tecnicas: ["LEFT JOIN", "HAVING", "COALESCE", "MAX"],
     grafico: { tipo: "barras", x: "residente", y: ["dias_sem_checkin"], rotulo: "Dias sem check-in", alerta: 7 },
@@ -57,7 +67,8 @@ HAVING max(r.data_hora) IS NULL
   },
   {
     id: 3,
-    titulo: "Distribuição da dor relatada (histograma)",
+    grupo: "bem_estar",
+    titulo: "Níveis de dor relatados",
     pergunta: "Com que frequência aparece cada nível de dor (0 a 10)?",
     tecnicas: ["generate_series", "LEFT JOIN", "função de janela SUM() OVER ()", "parâmetro $1"],
     periodo: { padrao: 30, opcoes: [7, 30, 90] },
@@ -75,7 +86,8 @@ HAVING max(r.data_hora) IS NULL
   },
   {
     id: 4,
-    titulo: "Evolução semanal do humor e da dor (8 semanas)",
+    grupo: "bem_estar",
+    titulo: "Humor e dor nas últimas 8 semanas",
     pergunta: "A casa está melhorando ou piorando semana a semana?",
     tecnicas: ["CTE (WITH)", "generate_series de semanas", "LEFT JOIN por intervalo", "função de janela LAG()"],
     grafico: { tipo: "linhas", x: "semana", y: ["humor_medio", "dor_media"],
@@ -110,6 +122,7 @@ SELECT to_char(inicio, 'DD/MM')
   },
   {
     id: 5,
+    grupo: "rotina",
     titulo: "Aceitação alimentar por grau de dependência",
     pergunta: "Residentes mais dependentes estão comendo menos?",
     tecnicas: ["INNER JOIN", "GROUP BY", "COUNT ... FILTER", "AVG", "parâmetro $1"],
@@ -130,6 +143,7 @@ SELECT to_char(inicio, 'DD/MM')
   },
   {
     id: 6,
+    grupo: "ocorrencias",
     titulo: "Intercorrências por tipo e gravidade",
     pergunta: "Que tipo de ocorrência mais acontece e quão grave ela é?",
     tecnicas: ["GROUP BY", "COUNT ... FILTER", "porcentagem com agregação", "parâmetro $1"],
@@ -148,7 +162,8 @@ SELECT to_char(inicio, 'DD/MM')
   },
   {
     id: 7,
-    titulo: "Adesão à medicação (dias completos)",
+    grupo: "saude",
+    titulo: "Adesão à medicação",
     pergunta: "Das doses que deveriam ter sido dadas, quantas foram registradas?",
     tecnicas: ["CTE (WITH)", "CROSS JOIN LATERAL unnest(array)", "generate_series", "LEFT JOIN", "parâmetro $1"],
     periodo: { padrao: 7, opcoes: [7, 30, 90] },
@@ -178,7 +193,8 @@ SELECT i.nome                          AS residente,
   },
   {
     id: 8,
-    titulo: "Ranking de engajamento (check-ins, lazer e Xodó)",
+    grupo: "rotina",
+    titulo: "Quem está mais ativo (check-ins, atividades e Xodó)",
     pergunta: "Quem está mais ativo — e quem está se isolando?",
     tecnicas: ["4 CTEs", "LEFT JOIN múltiplo", "funções de janela RANK(), PERCENT_RANK() e MAX() OVER ()", "parâmetro $1"],
     periodo: { padrao: 30, opcoes: [7, 30, 90] },
@@ -241,7 +257,8 @@ SELECT rank() OVER (ORDER BY indice_engajamento DESC) AS posicao,
   },
   {
     id: 9,
-    titulo: "Isolamento: quem não joga dominó com outro idoso",
+    grupo: "rotina",
+    titulo: "Quem parou de jogar dominó com os colegas",
     pergunta: "Quem não sentou à mesa com nenhum colega no período — e com quem costumava jogar?",
     tecnicas: ["CTE com UNION ALL", "NOT EXISTS", "auto-junção (idoso × idoso)", "DISTINCT ON", "parâmetro $1"],
     periodo: { padrao: 14, opcoes: [7, 14, 30] },
@@ -286,6 +303,7 @@ SELECT i.nome                          AS residente,
   },
   {
     id: 10,
+    grupo: "ocorrencias",
     titulo: "Quedas recorrentes",
     pergunta: "Quem caiu duas vezes ou mais — e o plano de cuidado já trata da mobilidade?",
     tecnicas: ["INNER JOIN", "GROUP BY + HAVING", "subconsulta escalar", "EXISTS", "CASE", "parâmetro $1"],
@@ -324,6 +342,7 @@ HAVING count(*) >= 2
   // ------------------------------------------------------------------
   {
     id: 11,
+    grupo: "saude",
     etapa: 4,
     titulo: "Residentes sem aferição de sinais vitais",
     pergunta: "Quem está há dias sem ter pressão, saturação ou temperatura medidas?",
@@ -346,6 +365,7 @@ HAVING count(*) >= 2
   },
   {
     id: 12,
+    grupo: "ocorrencias",
     etapa: 4,
     titulo: "Intercorrências × recados de plantão",
     pergunta: "A passagem de plantão está acompanhando o que acontece com os residentes?",
@@ -381,6 +401,7 @@ SELECT i.nome                              AS residente,
   },
   {
     id: 13,
+    grupo: "bem_estar",
     etapa: 4,
     titulo: "Dor acima da média da própria ILPI",
     pergunta: "Quem está relatando mais dor que os colegas da mesma casa?",
@@ -412,6 +433,7 @@ HAVING avg(r.dor) > (SELECT avg(r2.dor)
   },
   {
     id: 14,
+    grupo: "rotina",
     etapa: 4,
     titulo: "Agenda de revisão do plano de cuidado",
     pergunta: "Quais metas ativas precisam ser revisadas em breve, e quando tiveram evolução?",
@@ -445,10 +467,11 @@ HAVING avg(r.dor) > (SELECT avg(r2.dor)
   },
   {
     id: 15,
+    grupo: "saude",
     etapa: 4,
     visao: true,
-    titulo: "Visão: mapa de medicação",
-    pergunta: "Cada prescrição ativa, quem prescreveu, a última dose e as doses da semana (vw_mapa_medicacao).",
+    titulo: "Mapa de medicação da semana",
+    pergunta: "Cada remédio em uso, quem prescreveu, a última dose e quantas doses foram dadas na semana.",
     tecnicas: ["VISÃO com 4 JOINs + LEFT JOIN", "FILTER", "parâmetro $1"],
     filtro: { rotulo: "Mostrar", padrao: "abaixo",
               opcoes: [["abaixo", "Só abaixo do previsto"], ["todas", "Todas as prescrições"]] },
@@ -468,10 +491,11 @@ HAVING avg(r.dor) > (SELECT avg(r2.dor)
   },
   {
     id: 16,
+    grupo: "ocorrencias",
     etapa: 4,
     visao: true,
-    titulo: "Visão: intercorrências e quem avisar",
-    pergunta: "O que aconteceu, se a família já sabe e para quem ligar (vw_intercorrencia_contato).",
+    titulo: "Intercorrências e quem avisar",
+    pergunta: "O que aconteceu, se a família já sabe e para quem ligar.",
     tecnicas: ["VISÃO com 3 JOINs + 2 LEFT JOINs", "parâmetros $1 e $2"],
     periodo: { padrao: 30, opcoes: [7, 30, 90] },
     filtro: { rotulo: "Família", padrao: "nao_avisada",

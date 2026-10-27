@@ -2411,23 +2411,21 @@ function PainelConsultas({ token, demo }) {
   return (
     <div>
       <p style={{ fontSize: 16, color: CORES.nota, margin: "0 0 12px" }}>
-        Cada pergunta abaixo é uma consulta SQL executada agora no banco. O resultado já vem limitado à sua ILPI.
+        Escolha uma pergunta para ver a resposta com os dados atuais da sua ILPI.
       </p>
       {erro && <Aviso msg={erro} />}
       <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
         {lista.map((c, k) => (
           <div key={c.id} style={{ display: "contents" }}>
-          {(k === 0 || lista[k - 1].etapa !== c.etapa) && (
-            <h3 style={{ fontSize: 17, margin: k === 0 ? "0 0 2px" : "10px 0 2px", color: CORES.nota }}>
-              {c.etapa === 4 ? "Etapa 04 — consultas avançadas e visões" : "Etapa 03 — consultas da primeira versão"}
-            </h3>
+          {(k === 0 || lista[k - 1].grupo !== c.grupo) && (
+            <h3 style={{ fontSize: 17, margin: k === 0 ? "0 0 2px" : "10px 0 2px", color: CORES.nota }}>{c.rotulo_grupo}</h3>
           )}
           <button onClick={() => abrir(c)} aria-pressed={res && res.id === c.id} style={{
             textAlign: "left", padding: "12px 14px", borderRadius: 12, cursor: "pointer",
             border: res && res.id === c.id ? `3px solid ${CORES.anil}` : "2px solid #D8CFBC",
             background: res && res.id === c.id ? "#E7ECF8" : CORES.cartao, fontFamily: "'Atkinson Hyperlegible', sans-serif",
           }}>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>{c.id}. {c.titulo}{carregando === c.id ? " …" : ""}</div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>{c.titulo}{carregando === c.id ? " …" : ""}</div>
             <div style={{ fontSize: 14, color: CORES.nota }}>{c.pergunta}</div>
           </button>
           </div>
@@ -2450,11 +2448,6 @@ function PainelConsultas({ token, demo }) {
               {res.filtro.opcoes.map(([v, r]) => botaoOpcao(res.filtro.valor === v, r,
                 () => abrir(res, res.periodo && res.periodo.dias, v)))}
             </div>
-          )}
-          {res.visao && (
-            <p style={{ fontSize: 14, color: CORES.nota, margin: "0 0 10px" }}>
-              Esta tela lê uma <b>visão</b> do banco: o SQL abaixo consulta a visão como se fosse uma tabela.
-            </p>
           )}
           {res.linhas.length === 0 ? (
             <p style={{ fontSize: 16 }}>Nenhuma linha retornada — nada a alertar por aqui.</p>
@@ -2650,8 +2643,8 @@ function PainelDashboard({ token, demo }) {
 
       {/* ---------- Gráficos ---------- */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(330px, 1fr))", gap: 12 }}>
-        <CartaoGrafico titulo={`1. Distribuição: ${M.rotulo.toLowerCase()} (${M.min} a ${M.max})`}
-          sobre="Frequência de cada valor marcado nos check-ins, com as medidas de tendência central e de dispersão."
+        <CartaoGrafico titulo={`Como os residentes avaliam ${filtros.medida === "dor" ? "a" : "o"} ${M.rotulo.toLowerCase()} (${M.min} a ${M.max})`}
+          sobre="Quantas vezes cada nota foi marcada nos check-ins, com média, mediana, moda e o quanto as respostas variam."
           sql={d.sql.histograma + ";\n\n" + d.sql.estatisticas}>
           <GraficoColunas dados={d.histograma.map((h) => ({ rotulo: String(h.valor), valor: n(h.frequencia), extra: `${fmt(h.percentual)}% dos registros` }))}
             marcas={[{ nome: "média", valor: n(e.media), cor: CORES.alerta }, { nome: "mediana", valor: n(e.mediana), cor: CORES.verde, traco: "5 3" }]} />
@@ -2667,8 +2660,8 @@ function PainelDashboard({ token, demo }) {
           </div>
         </CartaoGrafico>
 
-        <CartaoGrafico titulo="2. Tendência no tempo"
-          sobre={`Média ${filtros.dias <= 30 ? "diária" : "semanal"} de humor, conforto e dor. A reta de tendência (mínimos quadrados) é calculada no banco com regr_slope.`}
+        <CartaoGrafico titulo="Evolução no tempo"
+          sobre={`Média ${filtros.dias <= 30 ? "de cada dia" : "de cada semana"} de humor, conforto e dor, e para onde a medida escolhida está indo.`}
           sql={d.sql.tendencia + ";\n\n" + d.sql.regressao}>
           {d.tendencia.length ? <GraficoLinhas linhas={d.tendencia} x="periodo" ys={["humor_medio", "conforto_medio", "dor_media"]} rotulo="" /> :
             <p style={{ fontSize: 15, color: CORES.nota }}>Sem check-ins no período.</p>}
@@ -2681,22 +2674,22 @@ function PainelDashboard({ token, demo }) {
           </p>
         </CartaoGrafico>
 
-        <CartaoGrafico titulo="3. Residentes por grau de dependência"
-          sobre="Toque numa fatia (ou na legenda) para filtrar o dashboard inteiro por aquele grau. Toque de novo para voltar a todos."
+        <CartaoGrafico titulo="Residentes por grau de dependência"
+          sobre="Toque numa fatia para ver o painel só daquele grau. Toque de novo para voltar a todos."
           sql={d.sql.residentes_grau}>
           <GraficoPizza rosca selecionado={filtros.grau === "todos" ? null : filtros.grau}
             aoClicar={(g) => setFiltros({ ...filtros, grau: filtros.grau === g ? "todos" : g })}
             dados={d.residentes_grau.map((g, i) => ({ rotulo: `Grau ${g.categoria}`, chave: g.categoria, valor: n(g.total), cor: [CORES.verde, "#C2701F", CORES.alerta][i] }))} />
         </CartaoGrafico>
 
-        <CartaoGrafico titulo="4. Intercorrências por tipo"
-          sobre="Frequência de cada tipo de ocorrência no período (passe o dedo ou o mouse para ver o percentual)."
+        <CartaoGrafico titulo="Intercorrências por tipo"
+          sobre="Que tipo de ocorrência mais aconteceu no período."
           sql={d.sql.intercorrencias_tipo}>
           <GraficoPizza dados={d.intercorrencias_tipo.map((t) => ({ rotulo: `${ROTULO_CAT[t.categoria] || t.categoria}${n(t.graves) ? ` (${t.graves} grave)` : ""}`, chave: t.categoria, valor: n(t.total) }))} />
         </CartaoGrafico>
 
-        <CartaoGrafico titulo="5. Participação nas atividades"
-          sobre="% dos residentes que foram a pelo menos uma atividade de cada tipo: período atual comparado ao anterior."
+        <CartaoGrafico titulo="Participação nas atividades"
+          sobre="Quantos residentes (%) foram a pelo menos uma atividade de cada tipo, comparando com o período anterior."
           sql={d.sql.radar_atividades}>
           <GraficoRadar eixos={d.radar_atividades.map((r) => ROTULO_CAT[r.categoria] || r.categoria)}
             series={[
@@ -2705,8 +2698,8 @@ function PainelDashboard({ token, demo }) {
             ]} />
         </CartaoGrafico>
 
-        <CartaoGrafico titulo="6. Correlação: atividades × humor"
-          sobre="Cada ponto é um residente. Quem participa de mais atividades está de melhor humor? O coeficiente de Pearson (corr) e a reta (regr_slope, regr_intercept) vêm do banco."
+        <CartaoGrafico titulo="Atividades e humor andam juntos?"
+          sobre="Cada ponto é um residente. A linha tracejada mostra a tendência: quem vai a mais atividades costuma estar de melhor humor?"
           sql={d.sql.dispersao + ";\n\n" + d.sql.correlacao}>
           <GraficoDispersao rotuloX="atividades no período" rotuloY="humor médio"
             pontos={d.dispersao.filter((p) => p.humor_medio !== null).map((p) => ({ x: n(p.atividades), y: n(p.humor_medio), rotulo: p.nome }))}
@@ -2716,8 +2709,8 @@ function PainelDashboard({ token, demo }) {
           </p>
         </CartaoGrafico>
 
-        <CartaoGrafico titulo="7. Aceitação alimentar por refeição"
-          sobre="Média do quanto foi aceito em cada refeição (0 a 100%), com o desvio padrão."
+        <CartaoGrafico titulo="Aceitação alimentar por refeição"
+          sobre="Quanto do prato foi aceito, em média, em cada refeição (0 a 100%)."
           sql={d.sql.refeicoes}>
           {d.refeicoes.length ? (
             <GraficoColunas sufixo="%" cor={CORES.verde}
@@ -2726,8 +2719,8 @@ function PainelDashboard({ token, demo }) {
           ) : <p style={{ fontSize: 15, color: CORES.nota }}>Sem refeições registradas no período.</p>}
         </CartaoGrafico>
 
-        <CartaoGrafico titulo="8. Pressão arterial por classificação"
-          sobre="Aferições do período classificadas pela função fn_classificar_pressao (Etapa 05), segundo a Diretriz Brasileira de Hipertensão."
+        <CartaoGrafico titulo="Pressão arterial"
+          sobre="Aferições do período por classificação, segundo a Diretriz Brasileira de Hipertensão."
           sql={d.sql.pressao}>
           {d.pressao.length ? (
             <GraficoBarrasH linhas={d.pressao.map((p) => ({ classe: p.classe, afericoes: n(p.afericoes) }))} x="classe" y="afericoes" rotulo="Nº de aferições" nomeInteiro />
@@ -2772,8 +2765,8 @@ function PainelCuidadores({ token, demo }) {
           residentes: grau I vale 3 pontos, grau II vale 6 e grau III vale 10 (proporção da RDC 502).
         </p>
         <p style={{ fontSize: 15, color: CORES.nota, margin: "0 0 12px" }}>
-          Os botões executam no banco o procedimento <code>sp_distribuir_cuidadores</code>. Ele usa um <b>cursor</b> e trata um
-          residente por vez, sempre para o cuidador com menos carga naquele momento.
+          A distribuição vai de residente em residente, começando pelos mais dependentes, e entrega cada um ao cuidador
+          que está com menos carga naquele momento.
         </p>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <BotaoGrande cor={CORES.verde} onClick={() => distribuir(false)} disabled={d.sem_referencia.length === 0}>
@@ -2786,7 +2779,7 @@ function PainelCuidadores({ token, demo }) {
 
       {log.length > 0 && (
         <Cartao borda={CORES.verde}>
-          <p style={{ fontSize: 17, fontWeight: 700, margin: "0 0 6px" }}>O que o procedimento fez</p>
+          <p style={{ fontSize: 17, fontWeight: 700, margin: "0 0 6px" }}>Como ficou a distribuição</p>
           <ol style={{ fontSize: 15, margin: 0, paddingLeft: 22, maxHeight: 220, overflowY: "auto" }}>
             {log.map((m, i) => <li key={i}>{m}</li>)}
           </ol>
@@ -2795,7 +2788,7 @@ function PainelCuidadores({ token, demo }) {
 
       <Cartao>
         <p style={{ fontSize: 17, fontWeight: 700, margin: "0 0 4px" }}>
-          Carga por cuidador · {d.cuidadores.length} na equipe, {d.necessarios} exigido(s) por turno (fn_cuidadores_necessarios)
+          Carga por cuidador · {d.cuidadores.length} na equipe, {d.necessarios} exigido(s) por turno pela RDC 502
         </p>
         {d.cuidadores.length === 0 ? <p style={{ fontSize: 15, color: CORES.nota }}>Nenhum cuidador ativo.</p> : (
           <>
@@ -2902,8 +2895,7 @@ function ListaPessoas({ pessoas, token, demo, aoMudar }) {
           <div style={{ background: CORES.papel, borderRadius: 16, padding: 20, maxWidth: 460, width: "100%" }}>
             <h3 style={{ fontSize: 22, margin: "0 0 10px" }}>Desligar {desligar.nome}?</h3>
             <p style={{ fontSize: 16, margin: "0 0 8px" }}>
-              Use em caso de alta, transferência ou óbito. O banco executa o procedimento
-              <code> sp_desligar_residente</code>, que faz tudo de uma vez:
+              Use em caso de alta, transferência ou óbito. Tudo isto acontece de uma vez:
             </p>
             <ul style={{ fontSize: 16, margin: "0 0 12px", paddingLeft: 22 }}>
               <li>marca o residente e a conta dele como inativos;</li>
@@ -2949,7 +2941,7 @@ function ListaPessoas({ pessoas, token, demo, aoMudar }) {
                   {!historico && <p style={{ fontSize: 14, margin: "6px 0 0", color: CORES.nota }}>Carregando…</p>}
                   {historico && historico.length === 0 && (
                     <p style={{ fontSize: 14, margin: "6px 0 0", color: CORES.nota }}>
-                      Nenhuma mudança registrada. Ao salvar um grau diferente, o banco grava aqui (trigger).
+                      Nenhuma mudança registrada. Quando o grau for alterado, a mudança aparece aqui.
                     </p>
                   )}
                   {historico && historico.map((h) => (
@@ -4861,7 +4853,7 @@ function PlantaoEquipe({ token, demo, painel }) {
             ) : (
               <p style={{ fontSize: 17, margin: "0 0 8px" }}>
                 {r.texto.startsWith("[Alerta automático]") && (
-                  <span title="Criado pelo banco (trigger) a partir dos sinais vitais" style={{
+                  <span title="Gerado automaticamente a partir dos sinais vitais" style={{
                     fontSize: 13, fontWeight: 700, background: CORES.anil, color: "#fff", borderRadius: 6, padding: "1px 6px", marginRight: 6,
                   }}>🤖 automático</span>
                 )}

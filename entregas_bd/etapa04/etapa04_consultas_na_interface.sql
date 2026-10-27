@@ -141,8 +141,8 @@ SELECT i.nome                                AS residente,
 EXECUTE consulta_14(15, 'todas');
 
 -- ------------------------------------------------------------
--- 15) Visão: mapa de medicação
---    Pergunta: Cada prescrição ativa, quem prescreveu, a última dose e as doses da semana (vw_mapa_medicacao).
+-- 15) Mapa de medicação da semana
+--    Pergunta: Cada remédio em uso, quem prescreveu, a última dose e quantas doses foram dadas na semana.
 --    Técnicas: VISÃO com 4 JOINs + LEFT JOIN, FILTER, parâmetro $1
 --    Gráfico na interface: barras de adesao_semana_pct por residente_medicamento
 --    Parâmetro $1: mostrar (na tela: abaixo, todas; padrão abaixo)
@@ -162,8 +162,8 @@ SELECT residente || ' · ' || medicamento AS residente_medicamento,
 EXECUTE consulta_15('abaixo');
 
 -- ------------------------------------------------------------
--- 16) Visão: intercorrências e quem avisar
---    Pergunta: O que aconteceu, se a família já sabe e para quem ligar (vw_intercorrencia_contato).
+-- 16) Intercorrências e quem avisar
+--    Pergunta: O que aconteceu, se a família já sabe e para quem ligar.
 --    Técnicas: VISÃO com 3 JOINs + 2 LEFT JOINs, parâmetros $1 e $2
 --    Gráfico na interface: pizza com a contagem de linhas por tipo
 --    Parâmetro $1: período em dias (na tela: 7, 30, 90; padrão 30)

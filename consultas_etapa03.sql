@@ -41,7 +41,7 @@ SELECT i.nome                          AS residente,
 EXECUTE consulta_1(30);
 
 -- ------------------------------------------------------------
--- 2) Alerta: residentes sem check-in há mais de 3 dias
+-- 2) Residentes sem check-in há mais de 3 dias
 --    Pergunta: Quem a equipe precisa procurar hoje?
 --    Técnicas: LEFT JOIN, HAVING, COALESCE, MAX
 --    Gráfico na interface: barras de dias_sem_checkin por residente
@@ -63,7 +63,7 @@ HAVING max(r.data_hora) IS NULL
  ORDER BY dias_sem_checkin DESC;
 
 -- ------------------------------------------------------------
--- 3) Distribuição da dor relatada (histograma)
+-- 3) Níveis de dor relatados
 --    Pergunta: Com que frequência aparece cada nível de dor (0 a 10)?
 --    Técnicas: generate_series, LEFT JOIN, função de janela SUM() OVER (), parâmetro $1
 --    Gráfico na interface: barras de frequencia por nivel_dor
@@ -83,7 +83,7 @@ SELECT n.nivel                         AS nivel_dor,
 EXECUTE consulta_3(30);
 
 -- ------------------------------------------------------------
--- 4) Evolução semanal do humor e da dor (8 semanas)
+-- 4) Humor e dor nas últimas 8 semanas
 --    Pergunta: A casa está melhorando ou piorando semana a semana?
 --    Técnicas: CTE (WITH), generate_series de semanas, LEFT JOIN por intervalo, função de janela LAG()
 --    Gráfico na interface: linhas de humor_medio e dor_media por semana
@@ -156,7 +156,7 @@ SELECT ic.tipo::text                   AS tipo,
 EXECUTE consulta_6(90);
 
 -- ------------------------------------------------------------
--- 7) Adesão à medicação (dias completos)
+-- 7) Adesão à medicação
 --    Pergunta: Das doses que deveriam ter sido dadas, quantas foram registradas?
 --    Técnicas: CTE (WITH), CROSS JOIN LATERAL unnest(array), generate_series, LEFT JOIN, parâmetro $1
 --    Gráfico na interface: barras de adesao_pct por residente
@@ -185,7 +185,7 @@ SELECT i.nome                          AS residente,
 EXECUTE consulta_7(7);
 
 -- ------------------------------------------------------------
--- 8) Ranking de engajamento (check-ins, lazer e Xodó)
+-- 8) Quem está mais ativo (check-ins, atividades e Xodó)
 --    Pergunta: Quem está mais ativo — e quem está se isolando?
 --    Técnicas: 4 CTEs, LEFT JOIN múltiplo, funções de janela RANK(), PERCENT_RANK() e MAX() OVER (), parâmetro $1
 --    Gráfico na interface: barras de indice_engajamento por residente
@@ -244,7 +244,7 @@ SELECT rank() OVER (ORDER BY indice_engajamento DESC) AS posicao,
 EXECUTE consulta_8(30);
 
 -- ------------------------------------------------------------
--- 9) Isolamento: quem não joga dominó com outro idoso
+-- 9) Quem parou de jogar dominó com os colegas
 --    Pergunta: Quem não sentou à mesa com nenhum colega no período — e com quem costumava jogar?
 --    Técnicas: CTE com UNION ALL, NOT EXISTS, auto-junção (idoso × idoso), DISTINCT ON, parâmetro $1
 --    Gráfico na interface: barras de dias_sem_jogar_a_dois por residente

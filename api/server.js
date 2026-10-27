@@ -15,7 +15,7 @@ import cors from "cors";
 import jwt from "jsonwebtoken";
 import pg from "pg";
 import PDFDocument from "pdfkit";
-import { CONSULTAS } from "./consultas.js";
+import { CONSULTAS, GRUPOS } from "./consultas.js";
 import { DASHBOARD, MEDIDAS } from "./dashboard.js";
 
 const { Pool } = pg;
@@ -1899,10 +1899,12 @@ app.get("/dashboard", autenticar, async (req, res) => {
 // Os SQLs vivem em consultas.js. Rodam com a identidade do usuário,
 // então o RLS limita o resultado à ILPI de quem pediu.
 // ============================================================
+// Lista na ordem dos grupos temáticos da tela (bem-estar, saúde, ...)
 app.get("/consultas", autenticar, (req, res) => {
-  res.json(CONSULTAS.map(({ id, etapa, visao, titulo, pergunta, tecnicas, grafico, periodo, filtro }) =>
-    ({ id, etapa: etapa || 3, visao: !!visao, titulo, pergunta, tecnicas, grafico,
-       periodo: periodo || null, filtro: filtro || null })));
+  const ordem = (c) => GRUPOS.findIndex(([g]) => g === c.grupo);
+  res.json([...CONSULTAS].sort((a, b) => ordem(a) - ordem(b)).map(({ id, grupo, etapa, visao, titulo, pergunta, tecnicas, grafico, periodo, filtro }) =>
+    ({ id, grupo, rotulo_grupo: (GRUPOS.find(([g]) => g === grupo) || [])[1] || "", etapa: etapa || 3, visao: !!visao,
+       titulo, pergunta, tecnicas, grafico, periodo: periodo || null, filtro: filtro || null })));
 });
 
 app.get("/consultas/:id", autenticar, async (req, res) => {
