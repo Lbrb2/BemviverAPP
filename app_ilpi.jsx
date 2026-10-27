@@ -2086,7 +2086,8 @@ function VisaoGestor({ token, demo }) {
 const num = (v) => (v === null || v === undefined || v === "" ? null : Number(v));
 // primeiro nome + último sobrenome ("Maria das Dores Bezerra Rêgo" -> "Maria Rêgo")
 const nomeCurto = (t) => { const p = String(t).trim().split(/\s+/); return p.length > 2 ? `${p[0]} ${p[p.length - 1]}` : String(t); };
-const ROTULO_COL = (c) => c.replace(/_/g, " ").replace(/\bpct\b/, "%").replace(/\bml\b/, "(ml)");
+const ROTULO_COL = (c) => c.replace(/_/g, " ").replace(/\bpct\b/, "%").replace(/\bml\b/, "(ml)")
+  .replace(/\bmedio\b/, "médio").replace(/\bmedia\b/, "média");
 
 function GraficoBarrasH({ linhas, x, y, max, alerta, alerta_abaixo, rotulo, linhaRef, nomeInteiro }) {
   const vals = linhas.map((l) => num(l[y]) ?? 0);
@@ -2627,7 +2628,7 @@ function PainelDashboard({ token, demo }) {
       </div>
 
       {/* ---------- Indicadores resumidos ---------- */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(clamp(140px, 22%, 260px), 1fr))", gap: 10, marginBottom: 14 }}>
         <Indicador rotulo="Residentes no recorte" valor={k.residentes} detalhe={`${fmt(k.pct_residentes_com_checkin)}% fizeram check-in`} />
         <Indicador rotulo="Check-ins de bem-estar" valor={k.checkins}
           detalhe={n(k.residentes) ? `${fmt(n(k.checkins) / n(k.residentes) / filtros.dias, 2)} por residente/dia` : null} />
