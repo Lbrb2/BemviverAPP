@@ -35,16 +35,16 @@ echo  [1/6] Criando o banco "ilpi"...
 createdb -h localhost -U postgres ilpi 2>nul
 if errorlevel 1 echo        O banco ja existia - tudo bem, seguindo em frente.
 
-echo  [2/6] Criando as tabelas (schema_ilpi.sql)...
-psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f schema_ilpi.sql
+echo  [2/6] Criando as tabelas (banco\schema_ilpi.sql)...
+psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f banco\schema_ilpi.sql
 if errorlevel 1 goto erro
 
-echo  [3/6] Inserindo os dados de exemplo (seed_ilpi.sql)...
-psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f seed_ilpi.sql
+echo  [3/6] Inserindo os dados de exemplo (banco\seed_ilpi.sql)...
+psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f banco\seed_ilpi.sql
 if errorlevel 1 goto erro
 
-echo  [4/6] Aplicando a seguranca por linha (rls_ilpi.sql)...
-psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f rls_ilpi.sql
+echo  [4/6] Aplicando a seguranca por linha (banco\rls_ilpi.sql)...
+psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f banco\rls_ilpi.sql
 if errorlevel 1 goto erro
 
 echo  [5/6] Preparando a API (api\setup_api.sql)...
@@ -52,11 +52,11 @@ psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f api\setup_api.sql
 if errorlevel 1 goto erro
 
 echo  [6/6] Indices, visoes, funcoes, procedimentos e triggers (Etapas 04 a 06)...
-psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f entregas_bd\etapa04\etapa04_indices_e_visoes.sql
+psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f banco\etapa04_indices_e_visoes.sql
 if errorlevel 1 goto erro
-psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f entregas_bd\etapa05\etapa05_funcoes_procedimentos_triggers.sql
+psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f banco\etapa05_funcoes_procedimentos_triggers.sql
 if errorlevel 1 goto erro
-psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f migracao_014_etapa06.sql
+psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f banco\etapa06_exclusao_crud.sql
 if errorlevel 1 goto erro
 
 echo.

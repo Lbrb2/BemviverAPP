@@ -35,9 +35,7 @@ Render e Vercel puxam o código do GitHub. Se ainda não tem o projeto lá:
    bemviver-ilpi/
    ├── api/              (a pasta da API: server.js, package.json)
    ├── bemviver/         (o projeto Vite do app — já vem pronto no repositório)
-   ├── schema_ilpi.sql
-   ├── seed_ilpi.sql
-   ├── rls_ilpi.sql
+   ├── banco/            (schema_ilpi.sql, seed_ilpi.sql, rls_ilpi.sql e os objetos das etapas)
    └── ...
    ```
 
@@ -60,13 +58,13 @@ Render e Vercel puxam o código do GitHub. Se ainda não tem o projeto lá:
 
 4. Agora rode nossos scripts no banco. No painel do Neon há um **SQL Editor**.
    Cole e execute, **nesta ordem**, o conteúdo de cada arquivo:
-   1. `schema_ilpi.sql` (cria as tabelas)
-   2. `seed_ilpi.sql` (dados de demonstração)
-   3. `rls_ilpi.sql` (segurança + papel app_user)
+   1. `banco/schema_ilpi.sql` (cria as tabelas)
+   2. `banco/seed_ilpi.sql` (dados de demonstração)
+   3. `banco/rls_ilpi.sql` (segurança + papel app_user)
    4. `api/setup_api.sql` (ajustes da API)
-   5. `entregas_bd/etapa04/etapa04_indices_e_visoes.sql` (índices e visões)
-   6. `entregas_bd/etapa05/etapa05_funcoes_procedimentos_triggers.sql` (funções, procedimentos e triggers)
-   7. `migracao_014_etapa06.sql` (exclusão de atividades e recados de plantão)
+   5. `banco/etapa04_indices_e_visoes.sql` (índices e visões)
+   6. `banco/etapa05_funcoes_procedimentos_triggers.sql` (funções, procedimentos e triggers)
+   7. `banco/etapa06_exclusao_crud.sql` (exclusão de atividades e recados de plantão)
 
    > No `rls_ilpi.sql` há uma linha `CREATE ROLE app_user NOLOGIN;`. Para a
    > nuvem, o app_user precisa poder logar. Depois de rodar tudo, execute:

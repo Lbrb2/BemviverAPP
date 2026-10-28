@@ -1,9 +1,11 @@
 // Gera, a partir dos SQLs que a API executa (fonte única):
-//   ../consultas_etapa03.sql                                (consultas 1 a 10)
+//   ../banco/consultas/consultas_etapa03.sql                 (consultas 1 a 10)
 //   ../entregas_bd/etapa04/etapa04_consultas_na_interface.sql (11 a 16)
 //   ../entregas_bd/etapa06/etapa06_sql_dashboard.sql        (dashboard)
+// e copia para entregas_bd/ os objetos das Etapas 04 e 05, cuja fonte única
+// é banco/ (o instalador roda os de banco/; a entrega leva a mesma cópia).
 // Uso: node gerar_sql_consultas.js
-import { writeFileSync } from "node:fs";
+import { writeFileSync, copyFileSync } from "node:fs";
 import { CONSULTAS } from "./consultas.js";
 import { DASHBOARD } from "./dashboard.js";
 
@@ -57,7 +59,7 @@ function bloco(c) {
 
 // Etapa 03: consultas 1 a 10 (arquivo na raiz, como foi entregue)
 const etapa3 = CONSULTAS.filter((c) => (c.etapa || 3) === 3);
-writeFileSync(new URL("../consultas_etapa03.sql", import.meta.url), cab + etapa3.map(bloco).join(""));
+writeFileSync(new URL("../banco/consultas/consultas_etapa03.sql", import.meta.url), cab + etapa3.map(bloco).join(""));
 console.log(`consultas_etapa03.sql gerado com ${etapa3.length} consultas.`);
 
 // Etapa 04: consultas 11 a 14 e as visões (15 e 16), como a interface executa
@@ -101,3 +103,10 @@ for (const [nome, sql] of Object.entries(DASHBOARD)) {
 }
 writeFileSync(new URL("../entregas_bd/etapa06/etapa06_sql_dashboard.sql", import.meta.url), cab6 + corpo6);
 console.log(`etapa06_sql_dashboard.sql gerado com ${n6} comandos.`);
+
+// Objetos das Etapas 04 e 05: banco/ é a fonte; entregas_bd/ recebe a cópia idêntica
+for (const [de, para] of [
+  ["../banco/etapa04_indices_e_visoes.sql", "../entregas_bd/etapa04/etapa04_indices_e_visoes.sql"],
+  ["../banco/etapa05_funcoes_procedimentos_triggers.sql", "../entregas_bd/etapa05/etapa05_funcoes_procedimentos_triggers.sql"],
+]) copyFileSync(new URL(de, import.meta.url), new URL(para, import.meta.url));
+console.log("Objetos das Etapas 04 e 05 copiados de banco/ para entregas_bd/.");

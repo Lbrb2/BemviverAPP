@@ -6,7 +6,7 @@
 Três passos no seu projeto Vite (a pasta "bemviver" criada com npm create vite):
 
 ## 1. Copie os arquivos
-Copie `manifest.webmanifest`, `sw.js` e `icone.svg` desta pasta para a pasta **`public/`** do projeto Vite.
+Copie `manifest.webmanifest`, `sw.js` e `icone.svg` da pasta `bemviver/public/` deste repositório para a pasta **`public/`** do projeto Vite.
 
 ## 2. Edite o `index.html` (na raiz do projeto Vite)
 Dentro do `<head>`, adicione:

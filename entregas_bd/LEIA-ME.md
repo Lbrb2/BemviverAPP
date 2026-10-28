@@ -2,6 +2,8 @@
 
 Modelagem e Projeto de Banco de Dados · Prof. Eduardo Nascimento de Arruda · Lucas Barreto Rodrigues de Barros e Vítor Lima
 
+Cada pasta reúne o que foi pedido naquela etapa. O banco que o app usa é criado pelos scripts da pasta `banco/` (na raiz do projeto), que o instalador roda em ordem; os arquivos das Etapas 04 e 05 aqui são cópias idênticas dos de `banco/`.
+
 ## Etapa 01 — Minimundo, modelo conceitual e lógico
 
 | O que o enunciado pede | Arquivo |
@@ -102,7 +104,7 @@ Para o procedimento com cursor, o residente ganhou a coluna `id_cuidador_referen
 
 ## Etapa 06 — Interface funcional com dashboard (versão final)
 
-Instalação igual à da Etapa 03 (`instalar_windows.bat` → `iniciar_api_windows.bat` → `iniciar_app_windows.bat`); o instalador já aplica as Etapas 04 e 05 e a `migracao_014_etapa06.sql`. Senha de todas as contas: `demo123`. Backend em Node.js (liberado pelo professor), sem ORM: todo comando é SQL escrito no código e enviado ao banco com parâmetros.
+Instalação igual à da Etapa 03 (`instalar_windows.bat` → `iniciar_api_windows.bat` → `iniciar_app_windows.bat`); o instalador já aplica as Etapas 04 e 05 e as permissões de exclusão do CRUD (`banco/etapa06_exclusao_crud.sql`). Senha de todas as contas: `demo123`. Backend em Node.js (liberado pelo professor), sem ORM: todo comando é SQL escrito no código e enviado ao banco com parâmetros.
 
 | O que o enunciado pede | Onde ver |
 |---|---|

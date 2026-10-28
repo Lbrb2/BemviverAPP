@@ -32,43 +32,41 @@ O acompanhamento segue instrumentos internacionalmente reconhecidos, todos com v
 
 ## Arquivos do projeto
 
-Os scripts SQL formam uma sequência: instalação nova roda apenas `schema_ilpi.sql` (que já incorpora as migrações); um banco existente aplica as migrações em ordem.
+```
+BemviverAPP/
+├─ instalar_windows.bat / _mac_linux.sh      Cria o banco e roda os scripts de banco/ (uma vez)
+├─ iniciar_api_windows.bat / _mac_linux.sh   Liga a API (porta 3000)
+├─ iniciar_app_windows.bat / _mac_linux.sh   Abre o app no navegador (porta 5173)
+├─ backup_windows.bat / _mac_linux.sh        Backup do banco com data no nome
+├─ app_ilpi.jsx          As telas do app: idoso, responsável, equipe e gestor
+│
+├─ api/                  A API em Node.js (Express + driver pg, SQL escrito à mão)
+│   ├─ server.js             Rotas, login com JWT e transação com a identidade do usuário
+│   ├─ consultas.js          SQL das 16 consultas da aba Consultas
+│   ├─ dashboard.js          SQL do dashboard estatístico do gestor
+│   ├─ setup_api.sql         Senhas (pgcrypto), login e permissão do app_user
+│   └─ gerar_sql_consultas.js   Gera os .sql das consultas e do dashboard a partir do código
+│
+├─ bemviver/             Projeto Vite que abre o app (importa ../app_ilpi.jsx; já com o PWA)
+│
+├─ banco/                Tudo o que cria o banco, na ordem em que o instalador roda
+│   ├─ schema_ilpi.sql       1. Tabelas, tipos, restrições e índices (já inclui as migrações)
+│   ├─ seed_ilpi.sql         2. Dados de exemplo (≥ 30 linhas em cada tabela)
+│   ├─ rls_ilpi.sql          3. Papel app_user, segurança por linha e auditoria
+│   │                        4. (api/setup_api.sql)
+│   ├─ etapa04_indices_e_visoes.sql            5. Índices e visões da Etapa 04
+│   ├─ etapa05_funcoes_procedimentos_triggers.sql  6. Funções, procedimentos e triggers
+│   ├─ etapa06_exclusao_crud.sql               7. Permissões de exclusão do CRUD
+│   ├─ consultas/            Consultas avulsas (as da Etapa 03 e as originais)
+│   ├─ exemplos/             Como cadastrar usuários direto pelo SQL
+│   └─ migracoes/            Histórico (001 a 013): atualizavam bancos antigos
+│
+├─ entregas_bd/          As entregas da disciplina, uma pasta por etapa, com LEIA-ME
+├─ docs/                 Documentos do Módulo 1, guia de hospedagem e guia do PWA
+└─ ferramentas/          Simulações e testes dos motores dos jogos (buraco e paciência)
+```
 
-```
-schema_ilpi.sql                  Schema canônico completo (tabelas, constraints, índices, view)
-seed_ilpi.sql                    Dados de exemplo: ≥ 30 tuplas em cada tabela (30 ILPIs,
-                                 32 idosos, 30 profissionais...), contas demo preservadas
-consultas_ilpi.sql               8 consultas analíticas e de alerta (versão original)
-consultas_etapa03.sql            As 10 consultas da tela "📊 Consultas" (gerado de api/consultas.js)
-demonstracao_acoes_referenciais.sql  Mostra ON UPDATE CASCADE e ON DELETE SET NULL (com ROLLBACK)
-entregas_bd/                     Entregas da disciplina de Banco de Dados (Etapas 01 a 06)
-rls_ilpi.sql                     Papel app_user, funções auxiliares e políticas de RLS
-migracao_001_domino.sql          Tabela partida_domino + RLS (para bancos existentes)
-migracao_002_painel_pontos.sql   Pontos do pet na view do painel (para bancos existentes)
-migracao_003_medicacao_mural.sql Medicação, Mural da Família e auditoria por trigger
-migracao_004_consentimento.sql   Fluxo e RLS do consentimento LGPD
-migracao_005_gestor.sql          Perfil de gestor e cadastro de usuários
-migracao_006_gestao_edicao.sql   Edição e desativação de usuários pelo gestor
-migracao_007_pet.sql             Xodó personalizável e fases de crescimento
-migracao_008_agenda.sql          Agenda de atividades com confirmação de presença
-novos_usuarios_exemplo.sql       Cadastro manual de usuários (via SQL, para testes)
-backup_windows.bat / _mac_linux  Backup do banco com data no nome (agende diariamente!)
-pwa/                             Manifesto, service worker, ícone e guia para instalar como app
-bemviver/                        Projeto Vite que abre o app (importa ../app_ilpi.jsx; já com o PWA)
-instalar_windows.bat / _mac_linux.sh      Cria o banco e roda os 4 scripts SQL
-iniciar_api_windows.bat / _mac_linux.sh   Liga a API (porta 3000)
-iniciar_app_windows.bat / _mac_linux.sh   Abre o app no navegador (porta 5173)
-app_ilpi.jsx                     App completo: check-in e Dominó do Lar (idoso), painel
-                                 do responsável, e área da equipe com alertas, lançamento
-                                 de check-ins, avaliações clínicas e evolução psicológica
-                                 (esta última visível apenas para psicólogos)
-api/setup_api.sql                pgcrypto, senhas demo e LOGIN do app_user
-api/server.js                    API Express com integração RLS por transação
-api/consultas.js                 SQL das consultas analíticas (fonte única: API e .sql)
-api/dashboard.js                 SQL do dashboard estatístico do gestor
-api/gerar_sql_consultas.js       Regera consultas_etapa03.sql a partir de consultas.js
-api/package.json                 Dependências (express, pg, jsonwebtoken, cors)
-```
+Os objetos das Etapas 04 e 05 têm a fonte em `banco/`; as cópias em `entregas_bd/` são atualizadas com `node api/gerar_sql_consultas.js`.
 
 ## Instalação
 
@@ -76,13 +74,13 @@ Requisitos: PostgreSQL 15 ou superior (a view usa `security_invoker`; testado no
 
 ```bash
 createdb ilpi
-psql -d ilpi -f schema_ilpi.sql
-psql -d ilpi -f seed_ilpi.sql
-psql -d ilpi -f rls_ilpi.sql
+psql -d ilpi -f banco/schema_ilpi.sql
+psql -d ilpi -f banco/seed_ilpi.sql
+psql -d ilpi -f banco/rls_ilpi.sql
 psql -d ilpi -f api/setup_api.sql
-psql -d ilpi -f entregas_bd/etapa04/etapa04_indices_e_visoes.sql
-psql -d ilpi -f entregas_bd/etapa05/etapa05_funcoes_procedimentos_triggers.sql
-psql -d ilpi -f migracao_014_etapa06.sql
+psql -d ilpi -f banco/etapa04_indices_e_visoes.sql
+psql -d ilpi -f banco/etapa05_funcoes_procedimentos_triggers.sql
+psql -d ilpi -f banco/etapa06_exclusao_crud.sql
 
 cd api
 npm install
@@ -183,4 +181,4 @@ Além do suporte a leitores de tela do próprio aparelho (NVDA, TalkBack, VoiceO
 
 O gestor da ILPI (função `gestor`) tem uma área própria no app para cadastrar residentes, equipe e responsáveis — cada cadastro cria o login com senha via pgcrypto e, no caso do responsável, já faz o vínculo que o RLS exige. Só o gestor cadastra, e apenas na própria ILPI (imposto por RLS e pela API). O gestor também edita dados e desativa/reativa contas — desativar preserva todo o histórico (nunca apaga), bloqueia o login e some das listas operacionais; há trava que impede a ILPI ficar sem gestor. Conta de demonstração: gestor@larpaz.com / demo123.
 
-Antes de colocar dados reais de idosos no sistema, é NECESSÁRIO: servir tudo em HTTPS; definir `JWT_SECRET` e as senhas do banco por variáveis de ambiente (a API avisa no console se o segredo padrão estiver em uso); trocar as contas e senhas de demonstração; implementar **backup automático diário** do PostgreSQL (`pg_dump` agendado) — dados de saúde perdidos são irrecuperáveis; formalizar o consentimento LGPD no fluxo de cadastro (a tabela existe, falta a tela); e validar a interface com os próprios idosos e a equipe. A prescrição registrada no app não substitui a prescrição médica formal — é o registro operacional de administração. Já implementados para uso real: auditoria por trigger (a trilha existe mesmo fora da API), limite de tentativas de login, bloqueio de dose duplicada no banco, e RLS em todas as tabelas sensíveis. Já entregues também: fluxo de consentimento LGPD com revogação (tela do responsável), relatório mensal em PDF por idoso, fila offline que reenvia check-ins e partidas quando a conexão volta, PWA instalável (pasta pwa/), scripts de backup e aviso ao responsável via link de WhatsApp nos alertas. Próximos passos: hospedagem pública (Render/Railway + Neon/Supabase), WhatsApp via API oficial (hoje é link wa.me) e empacotamento com Capacitor para as lojas.
+Antes de colocar dados reais de idosos no sistema, é NECESSÁRIO: servir tudo em HTTPS; definir `JWT_SECRET` e as senhas do banco por variáveis de ambiente (a API avisa no console se o segredo padrão estiver em uso); trocar as contas e senhas de demonstração; implementar **backup automático diário** do PostgreSQL (`pg_dump` agendado) — dados de saúde perdidos são irrecuperáveis; formalizar o consentimento LGPD no fluxo de cadastro (a tabela existe, falta a tela); e validar a interface com os próprios idosos e a equipe. A prescrição registrada no app não substitui a prescrição médica formal — é o registro operacional de administração. Já implementados para uso real: auditoria por trigger (a trilha existe mesmo fora da API), limite de tentativas de login, bloqueio de dose duplicada no banco, e RLS em todas as tabelas sensíveis. Já entregues também: fluxo de consentimento LGPD com revogação (tela do responsável), relatório mensal em PDF por idoso, fila offline que reenvia check-ins e partidas quando a conexão volta, PWA instalável (já dentro de bemviver/; guia em docs/COMO_INSTALAR_PWA.md), scripts de backup e aviso ao responsável via link de WhatsApp nos alertas. Próximos passos: hospedagem pública (Render/Railway + Neon/Supabase), WhatsApp via API oficial (hoje é link wa.me) e empacotamento com Capacitor para as lojas.

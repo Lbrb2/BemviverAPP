@@ -1,7 +1,7 @@
 // ============================================================
 // Consultas analíticas exibidas na tela "📊 Consultas" do gestor.
 // Este arquivo é a FONTE ÚNICA: a API executa estes SQLs e o arquivo
-// consultas_etapa03.sql é gerado a partir daqui (node gerar_sql_consultas.js),
+// banco/consultas/consultas_etapa03.sql é gerado a partir daqui (node gerar_sql_consultas.js),
 // então o que o professor lê é exatamente o que a interface roda.
 //
 // Parâmetro: as consultas com "periodo" recebem $1 = nº de dias da janela

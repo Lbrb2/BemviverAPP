@@ -1,7 +1,7 @@
 -- ============================================================
 -- Demonstração das ações referenciais (ON UPDATE CASCADE e
 -- ON DELETE SET NULL). Rodar depois do schema e do seed, no psql:
---     psql -U postgres -d ilpi -f demonstracao_acoes_referenciais.sql
+--     psql -U postgres -d ilpi -f entregas_bd/etapa02/etapa02_demonstracao_acoes_referenciais.sql
 -- Tudo acontece dentro de uma transação desfeita no final (ROLLBACK):
 -- o banco volta exatamente ao estado anterior.
 -- ============================================================
