@@ -4157,13 +4157,16 @@ function Nutricao({ id_idoso, token, demo, podeEditar }) {
 }
 
 // ---------- Mini-gráfico de linha para sinais vitais ----------
-function LinhaVital({ pontos, faixa, unidade, titulo, cor = "#27418F" }) {
+const FORA_HABITUAL = "#C26A00";   // anel laranja: fora do padrão pessoal do residente
+function LinhaVital({ pontos, faixa, padrao, unidade, titulo, cor = "#27418F" }) {
   const vals = pontos.filter((p) => p.v != null);
   if (vals.length === 0) return null;
-  const W = 300, H = 90, pad = 6;
+  const W = 300, H = 90, pad = 9;   // margem para o anel laranja não ser cortado
   const ys = vals.map((p) => p.v);
-  let min = Math.min(...ys, faixa ? faixa[0] : Infinity);
-  let max = Math.max(...ys, faixa ? faixa[1] : -Infinity);
+  // padrão pessoal: média das últimas aferições do próprio residente (calculada no banco)
+  const media = padrao && padrao.media != null ? Number(padrao.media) : null;
+  let min = Math.min(...ys, faixa ? faixa[0] : Infinity, media ?? Infinity);
+  let max = Math.max(...ys, faixa ? faixa[1] : -Infinity, media ?? -Infinity);
   if (min === max) { min -= 1; max += 1; }
   const rango = max - min || 1;
   const x = (i) => pad + (i * (W - 2 * pad)) / Math.max(1, vals.length - 1);
@@ -4174,19 +4177,30 @@ function LinhaVital({ pontos, faixa, unidade, titulo, cor = "#27418F" }) {
     <div style={{ marginBottom: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15 }}>
         <b>{titulo}</b>
-        <span style={{ color: foraFaixa(vals.at(-1).v) ? CORES.alerta : CORES.verde, fontWeight: 700 }}>
-          {vals.at(-1).v}{unidade} {foraFaixa(vals.at(-1).v) ? "⚠" : "✓"}
+        <span style={{ color: foraFaixa(vals.at(-1).v) ? CORES.alerta : vals.at(-1).fp ? FORA_HABITUAL : CORES.verde, fontWeight: 700 }}>
+          {vals.at(-1).v}{unidade} {foraFaixa(vals.at(-1).v) ? "⚠" : vals.at(-1).fp ? "⚠ fora do habitual" : "✓"}
         </span>
       </div>
+      {media != null && (
+        <div style={{ fontSize: 13, color: CORES.nota }}>
+          Habitual: {String(media).replace(".", ",")} ± {String(padrao.desvio).replace(".", ",")}{unidade} ({padrao.n} aferições anteriores à última)
+        </div>
+      )}
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }} role="img"
         aria-label={`${titulo}: último valor ${vals.at(-1).v}${unidade}`}>
         {faixa && (
           <rect x={pad} y={y(faixa[1])} width={W - 2 * pad} height={Math.max(0, y(faixa[0]) - y(faixa[1]))}
             fill="#2E7D46" opacity="0.08" />
         )}
+        {media != null && (
+          <line x1={pad} x2={W - pad} y1={y(media)} y2={y(media)} stroke={cor} strokeWidth="1.5" strokeDasharray="4 4" opacity="0.6" />
+        )}
         <polyline points={linha} fill="none" stroke={cor} strokeWidth="2.5" strokeLinejoin="round" />
         {vals.map((p, i) => (
-          <circle key={i} cx={x(i)} cy={y(p.v)} r="3.5" fill={foraFaixa(p.v) ? CORES.alerta : cor} />
+          <g key={i}>
+            {p.fp && <circle cx={x(i)} cy={y(p.v)} r="7" fill="none" stroke={FORA_HABITUAL} strokeWidth="2.5" />}
+            <circle cx={x(i)} cy={y(p.v)} r="3.5" fill={foraFaixa(p.v) ? CORES.alerta : cor} />
+          </g>
         ))}
       </svg>
     </div>
@@ -4210,7 +4224,8 @@ function SinaisVitais({ id_idoso, token, demo }) {
   if (!dados) return <p style={{ fontSize: 15, color: CORES.nota }}>Carregando sinais…</p>;
   if (!dados.registros.length) return <p style={{ fontSize: 15, color: CORES.nota }}>Nenhum sinal vital registrado ainda.</p>;
   const R = dados.registros, F = dados.faixas;
-  const serie = (k) => R.map((r) => ({ v: r[k] != null ? Number(r[k]) : null }));
+  const serie = (k) => R.map((r) => ({ v: r[k] != null ? Number(r[k]) : null, fp: (r.fora_padrao || []).includes(k) }));
+  const P = dados.padrao || {};
   // Última pressão aferida e a classificação calculada no banco pela
   // função fn_classificar_pressao (Etapa 05)
   const ultPa = [...R].reverse().find((r) => r.pressao_sis != null && r.pressao_dia != null);
@@ -4227,13 +4242,14 @@ function SinaisVitais({ id_idoso, token, demo }) {
           {classePa && <b style={{ fontSize: 16, color: paAlerta ? CORES.alerta : CORES.verde }}>{classePa}</b>}
         </div>
       )}
-      <LinhaVital titulo="Pressão sistólica" unidade="" pontos={serie("pressao_sis")} faixa={F.pressao_sis} cor="#B3402A" />
-      <LinhaVital titulo="Freq. cardíaca" unidade=" bpm" pontos={serie("freq_cardiaca")} faixa={F.freq_cardiaca} cor="#27418F" />
+      <LinhaVital titulo="Pressão sistólica" unidade="" pontos={serie("pressao_sis")} faixa={F.pressao_sis} padrao={P.pressao_sis} cor="#B3402A" />
+      <LinhaVital titulo="Freq. cardíaca" unidade=" bpm" pontos={serie("freq_cardiaca")} faixa={F.freq_cardiaca} padrao={P.freq_cardiaca} cor="#27418F" />
       <LinhaVital titulo="Peso" unidade=" kg" pontos={serie("peso_kg")} cor="#2E7D46" />
-      <LinhaVital titulo="Glicemia" unidade=" mg/dL" pontos={serie("glicemia")} faixa={F.glicemia} cor="#8A6D1A" />
+      <LinhaVital titulo="Glicemia" unidade=" mg/dL" pontos={serie("glicemia")} faixa={F.glicemia} padrao={P.glicemia} cor="#8A6D1A" />
       <p style={{ fontSize: 13, color: CORES.nota, margin: "4px 0 0" }}>
         A faixa verde é o intervalo de referência. Pontos vermelhos estão fora dela — sinal para a equipe conferir.
-        A classificação da pressão segue a Diretriz Brasileira de Hipertensão. Valores muito fora da faixa geram um alerta automático na passagem de plantão.
+        A linha tracejada é o habitual desta pessoa, e um anel laranja marca um valor que foge muito dele, mesmo dentro da faixa.
+        A classificação da pressão segue a Diretriz Brasileira de Hipertensão. Os dois casos geram um alerta automático na passagem de plantão.
       </p>
     </div>
   );

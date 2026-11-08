@@ -747,13 +747,28 @@ app.get("/idosos/:id/sinais", autenticar, async (req, res) => {
   try {
     const linhas = await comUsuario(req.usuario.id_usuario, async (c) => {
       const { rows } = await c.query(
-        `SELECT id_sinal, data_hora, pressao_sis, pressao_dia, freq_cardiaca,
-                temperatura, peso_kg, glicemia, saturacao, observacoes,
-                fn_classificar_pressao(pressao_sis, pressao_dia) AS classificacao_pa   -- FUNÇÃO da Etapa 05
-           FROM sinal_vital WHERE id_idoso = $1 ORDER BY data_hora DESC LIMIT 60`, [id]);
-      return rows;
+        `SELECT s.id_sinal, s.data_hora, s.pressao_sis, s.pressao_dia, s.freq_cardiaca,
+                s.temperatura, s.peso_kg, s.glicemia, s.saturacao, s.observacoes,
+                fn_classificar_pressao(s.pressao_sis, s.pressao_dia) AS classificacao_pa,   -- FUNÇÃO da Etapa 05
+                -- medidas desta aferição fora do padrão pessoal (banco/alerta_padrao_pessoal.sql)
+                ARRAY(SELECT m.medida
+                        FROM (VALUES ('pressao_sis', s.pressao_sis::numeric), ('pressao_dia', s.pressao_dia::numeric),
+                                     ('freq_cardiaca', s.freq_cardiaca::numeric), ('temperatura', s.temperatura),
+                                     ('glicemia', s.glicemia::numeric), ('saturacao', s.saturacao::numeric)) m(medida, valor)
+                        CROSS JOIN LATERAL fn_fora_do_padrao(s.id_idoso, m.medida, m.valor, s.data_hora) f
+                       WHERE m.valor IS NOT NULL AND f.fora) AS fora_padrao
+           FROM sinal_vital s WHERE s.id_idoso = $1 ORDER BY s.data_hora DESC LIMIT 60`, [id]);
+      // o padrão (média e desvio) até antes da aferição mais recente: é com ele
+      // que a última medida foi comparada, então o gráfico mostra o mesmo que o alerta
+      const padrao = await c.query(
+        `SELECT m AS medida, p.media, round(p.desvio, 1) AS desvio, p.n
+           FROM unnest(ARRAY['pressao_sis','pressao_dia','freq_cardiaca','temperatura','glicemia','saturacao']) m
+          CROSS JOIN LATERAL fn_padrao_pessoal($1, m,
+                coalesce((SELECT max(data_hora) FROM sinal_vital WHERE id_idoso = $1), now())) p
+          WHERE p.n >= 4`, [id]);
+      return { rows, padrao: Object.fromEntries(padrao.rows.map((r) => [r.medida, r])) };
     });
-    res.json({ faixas: FAIXAS, registros: linhas.reverse() });
+    res.json({ faixas: FAIXAS, padrao: linhas.padrao, registros: linhas.rows.reverse() });
   } catch (e) { console.error(e); res.status(500).json({ erro: "Falha ao carregar os sinais." }); }
 });
 

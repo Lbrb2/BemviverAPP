@@ -57,8 +57,9 @@ BemviverAPP/
 │   ├─ etapa04_indices_e_visoes.sql            5. Índices e visões da Etapa 04
 │   ├─ etapa05_funcoes_procedimentos_triggers.sql  6. Funções, procedimentos e triggers
 │   ├─ etapa06_exclusao_crud.sql               7. Permissões de exclusão do CRUD
+│   ├─ alerta_padrao_pessoal.sql               8. Alerta pelo padrão pessoal de cada residente
 │   ├─ consultas/            Consultas avulsas (as da Etapa 03 e as originais)
-│   ├─ exemplos/             Como cadastrar usuários direto pelo SQL
+│   ├─ exemplos/             Cadastro de usuários pelo SQL e demonstração do alerta pessoal
 │   └─ migracoes/            Histórico (001 a 013): atualizavam bancos antigos
 │
 ├─ entregas_bd/          As entregas da disciplina, uma pasta por etapa, com LEIA-ME
@@ -81,6 +82,7 @@ psql -d ilpi -f api/setup_api.sql
 psql -d ilpi -f banco/etapa04_indices_e_visoes.sql
 psql -d ilpi -f banco/etapa05_funcoes_procedimentos_triggers.sql
 psql -d ilpi -f banco/etapa06_exclusao_crud.sql
+psql -d ilpi -f banco/alerta_padrao_pessoal.sql
 
 cd api
 npm install
@@ -146,6 +148,8 @@ Escalas clínicas guiadas: a equipe aplica GDS-15 (depressão) e Katz (autonomia
 ## Sinais vitais e plano de cuidado
 
 A equipe registra sinais vitais estruturados (pressão, batimentos, temperatura, peso, glicemia, saturação), com validação de faixa fisiológica no banco. Nos cartões de cada residente, gráficos de linha mostram a evolução e destacam em vermelho os pontos fora da faixa de referência — um alerta visual, não um diagnóstico. O plano de cuidado individual (PDI, previsto na RDC 502) reúne metas por categoria (saúde, mobilidade, nutrição, social, cognitiva, emocional, autonomia) com data de revisão e status (em andamento, atingida, suspensa); a família também visualiza as metas, dando transparência ao cuidado. Ambos entram no histórico com auditoria.
+
+**Alerta pelo padrão pessoal.** As faixas de referência são iguais para todos, mas o "normal" muda de pessoa para pessoa: 150 de sistólica é rotina para um hipertenso controlado e é um salto para quem vive com 115. Por isso o banco também compara cada aferição com o histórico do próprio residente (`banco/alerta_padrao_pessoal.sql`). O padrão é a média e o desvio padrão das últimas 10 aferições daquela medida, nos 120 dias anteriores (mínimo de 4). O valor é considerado fora do padrão quando está a 2,5 desvios ou mais da média (escore z) **e** a diferença é clinicamente relevante (por exemplo, 20 mmHg na sistólica). As duas condições juntas evitam alarme falso em quem tem medidas muito estáveis ou que variam muito. O trigger `trg_alerta_padrao_pessoal` cria um recado de atenção na passagem de plantão só para as medidas que ainda estão dentro da faixa geral; as que estão fora dela já são avisadas pelo trigger da Etapa 05. No gráfico, uma linha tracejada mostra o habitual da pessoa e um anel laranja marca a aferição fora do padrão. A visão `vw_sinal_fora_do_padrao` lista os casos dos últimos 30 dias. É detecção de anomalia estatística, feita inteira em SQL — um aviso para a equipe olhar com mais atenção, não um diagnóstico. Demonstração em `banco/exemplos/alerta_padrao_pessoal_demonstracao.sql`.
 
 ## Passagem de plantão
 

@@ -42,6 +42,7 @@ echo " [6/6] Índices, visões, funções, procedimentos e triggers (Etapas 04 a
 psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f banco/etapa04_indices_e_visoes.sql
 psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f banco/etapa05_funcoes_procedimentos_triggers.sql
 psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f banco/etapa06_exclusao_crud.sql
+psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f banco/alerta_padrao_pessoal.sql
 
 echo ""
 echo " === Tudo pronto! ==="

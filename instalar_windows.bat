@@ -58,6 +58,8 @@ psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f banco\etapa05_fun
 if errorlevel 1 goto erro
 psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f banco\etapa06_exclusao_crud.sql
 if errorlevel 1 goto erro
+psql -h localhost -U postgres -d ilpi -v ON_ERROR_STOP=1 -q -f banco\alerta_padrao_pessoal.sql
+if errorlevel 1 goto erro
 
 echo.
 echo  === Tudo pronto! ===
