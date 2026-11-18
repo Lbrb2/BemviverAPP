@@ -2089,7 +2089,7 @@ const nomeCurto = (t) => { const p = String(t).trim().split(/\s+/); return p.len
 const ROTULO_COL = (c) => c.replace(/_/g, " ").replace(/\bpct\b/, "%").replace(/\bml\b/, "(ml)")
   .replace(/\bmedio\b/, "médio").replace(/\bmedia\b/, "média");
 
-function GraficoBarrasH({ linhas, x, y, max, alerta, alerta_abaixo, rotulo, linhaRef, nomeInteiro }) {
+function GraficoBarrasH({ linhas, x, y, max, alerta, alerta_abaixo, rotulo, linhaRef, nomeInteiro, quebraRotulo }) {
   const vals = linhas.map((l) => num(l[y]) ?? 0);
   const teto = max || Math.max(1, ...vals);
   // linha de referência (ex.: média da ILPI), tracejada sobre as barras
@@ -2102,7 +2102,7 @@ function GraficoBarrasH({ linhas, x, y, max, alerta, alerta_abaixo, rotulo, linh
         const ruim = (alerta != null && v >= alerta) || (alerta_abaixo != null && v < alerta_abaixo);
         return (
           <div key={k} style={{ display: "grid", gridTemplateColumns: "minmax(90px, 38%) 1fr 52px", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <span style={{ fontSize: 14, textAlign: "right", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={String(l[x])}>{nomeInteiro ? String(l[x]) : nomeCurto(l[x])}</span>
+            <span style={{ fontSize: 14, textAlign: "right", lineHeight: 1.25, ...(quebraRotulo ? {} : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }) }} title={String(l[x])}>{nomeInteiro ? String(l[x]) : nomeCurto(l[x])}</span>
             <div style={{ background: "#EFE8D8", borderRadius: 6, height: 18, position: "relative" }}>
               <div style={{ width: `${Math.max(1.5, (100 * v) / teto)}%`, height: "100%", borderRadius: 6, background: ruim ? CORES.alerta : CORES.anil }} />
               {vRef !== null && (
@@ -2119,28 +2119,33 @@ function GraficoBarrasH({ linhas, x, y, max, alerta, alerta_abaixo, rotulo, linh
   );
 }
 
-function GraficoLinhas({ linhas, x, ys, rotulo }) {
+// yMin/yMax fixam a escala (ex.: humor de 1 a 5); sem eles, vai de 0 ao maior valor.
+function GraficoLinhas({ linhas, x, ys, rotulo, yMin, yMax, legenda = true }) {
   const W = 320, H = 170, esq = 28, dir = 20, topo = 10, base = 28;
   // null = semana sem registro: a linha é interrompida ali, em vez de despencar para zero
   const series = ys.map((c) => linhas.map((l) => num(l[c])));
-  const maxV = Math.ceil(Math.max(1, ...series.flat().filter((v) => v !== null)));
+  const minV = yMin ?? 0;
+  const maxV = yMax ?? Math.ceil(Math.max(1, ...series.flat().filter((v) => v !== null)));
   const trechos = (vs) => vs.reduce((acc, v, k) => {
     if (v === null) acc.push([]); else acc[acc.length - 1].push(`${px(k)},${py(v)}`);
     return acc;
   }, [[]]).filter((t) => t.length);
   const px = (k) => esq + (linhas.length === 1 ? (W - esq - dir) / 2 : (k * (W - esq - dir)) / (linhas.length - 1));
-  const py = (v) => topo + (H - topo - base) * (1 - v / maxV);
+  const py = (v) => topo + (H - topo - base) * (1 - (v - minV) / (maxV - minV));
   const estilos = [{ cor: CORES.anil, traco: "" }, { cor: CORES.alerta, traco: "6 4" }, { cor: CORES.verde, traco: "2 3" }];
   return (
     <figure style={{ margin: "0 0 14px" }} aria-label={rotulo}>
-      <figcaption style={{ fontSize: 14, color: CORES.nota, marginBottom: 6 }}>{rotulo}</figcaption>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxWidth: 520, background: CORES.cartao, borderRadius: 10 }} role="img">
-        {[0, 0.5, 1].map((f) => (
-          <g key={f}>
-            <line x1={esq} x2={W - dir} y1={py(maxV * f)} y2={py(maxV * f)} stroke="#E4DCC9" />
-            <text x={esq - 4} y={py(maxV * f) + 4} fontSize="10" textAnchor="end" fill={CORES.nota}>{+(maxV * f).toFixed(1)}</text>
-          </g>
-        ))}
+      {rotulo && <figcaption style={{ fontSize: 14, color: CORES.nota, marginBottom: 6 }}>{rotulo}</figcaption>}
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxWidth: 520, maxHeight: 250, display: "block", background: CORES.cartao, borderRadius: 10 }} role="img">
+        {[0, 0.5, 1].map((f) => {
+          const v = minV + (maxV - minV) * f;
+          return (
+            <g key={f}>
+              <line x1={esq} x2={W - dir} y1={py(v)} y2={py(v)} stroke="#E4DCC9" />
+              <text x={esq - 4} y={py(v) + 4} fontSize="10" textAnchor="end" fill={CORES.nota}>{+v.toFixed(1)}</text>
+            </g>
+          );
+        })}
         {linhas.map((l, k, todas) => (k % Math.ceil(todas.length / 8) === 0 ||
             (k === todas.length - 1 && k % Math.ceil(todas.length / 8) >= Math.ceil(todas.length / 8) / 2))
           ? <text key={k} x={px(k)} y={H - 10} fontSize="10" textAnchor="middle" fill={CORES.nota}>{l[x]}</text> : null)}
@@ -2153,14 +2158,14 @@ function GraficoLinhas({ linhas, x, ys, rotulo }) {
           </g>
         ))}
       </svg>
-      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 4 }}>
+      {legenda && <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 4 }}>
         {ys.map((c, si) => (
           <span key={c} style={{ fontSize: 14, display: "inline-flex", alignItems: "center", gap: 6 }}>
             <svg width="26" height="8"><line x1="0" x2="26" y1="4" y2="4" stroke={estilos[si].cor} strokeWidth="3" strokeDasharray={estilos[si].traco} /></svg>
             {ROTULO_COL(c)}
           </span>
         ))}
-      </div>
+      </div>}
     </figure>
   );
 }
@@ -2230,9 +2235,10 @@ function GraficoPizza({ dados, rotulo, rosca, selecionado, aoClicar }) {
 
 // Colunas verticais (histograma). "marcas" desenha linhas verticais em
 // valores da escala (ex.: média e mediana).
-function GraficoColunas({ dados, rotulo, marcas = [], cor = CORES.anil, sufixo = "" }) {
+// "teto" fixa o topo do eixo (ex.: 100 para porcentagens).
+function GraficoColunas({ dados, rotulo, marcas = [], cor = CORES.anil, sufixo = "", teto }) {
   const W = 340, H = 190, esq = 30, dir = 10, topo = 26, base = 26;
-  const maxV = Math.max(1, ...dados.map((d) => d.valor));
+  const maxV = teto || Math.max(1, ...dados.map((d) => d.valor));
   const n = dados.length, larg = (W - esq - dir) / n;
   const px = (k) => esq + larg * k + larg / 2;
   const py = (v) => topo + (H - topo - base) * (1 - v / maxV);
@@ -2245,7 +2251,7 @@ function GraficoColunas({ dados, rotulo, marcas = [], cor = CORES.anil, sufixo =
   return (
     <figure style={{ margin: 0 }} aria-label={rotulo}>
       {rotulo && <figcaption style={{ fontSize: 14, color: CORES.nota, marginBottom: 6 }}>{rotulo}</figcaption>}
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", background: CORES.cartao, borderRadius: 10 }} role="img">
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxHeight: 250, display: "block", background: CORES.cartao, borderRadius: 10 }} role="img">
         {[0, 0.5, 1].map((f) => (
           <g key={f}>
             <line x1={esq} x2={W - dir} y1={py(maxV * f)} y2={py(maxV * f)} stroke="#E4DCC9" />
@@ -2280,48 +2286,34 @@ function GraficoColunas({ dados, rotulo, marcas = [], cor = CORES.anil, sufixo =
   );
 }
 
-// Radar: um eixo por categoria, valores de 0 a "max"; várias séries sobrepostas.
-function GraficoRadar({ eixos, series, max = 100, rotulo, sufixo = "%" }) {
-  const C = 120, R = 82, n = eixos.length;
-  const ang = (k) => -Math.PI / 2 + (2 * Math.PI * k) / n;
-  const pt = (k, v) => [C + R * (v / max) * Math.cos(ang(k)), C + R * (v / max) * Math.sin(ang(k))];
+// Barras em pares: para cada categoria, o período atual e o anterior lado a lado.
+function GraficoBarrasPar({ itens, nomeA, nomeB, corA = CORES.anil, corB = "#C2701F", max = 100, sufixo = "%" }) {
+  const barra = (v, cor, nome, rotulo) => (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 52px", alignItems: "center", gap: 8 }}>
+      <div style={{ background: "#EFE8D8", borderRadius: 6, height: 14 }} title={`${nome} — ${rotulo}: ${fmt(v)}${sufixo}`}>
+        <div style={{ width: `${Math.max(v ? 1.5 : 0, (100 * (v || 0)) / max)}%`, height: "100%", borderRadius: 6, background: cor }} />
+      </div>
+      <span style={{ fontSize: 14, fontWeight: 700, color: cor }}>{fmt(v, 0)}{sufixo}</span>
+    </div>
+  );
   return (
-    <figure style={{ margin: 0 }} aria-label={rotulo}>
-      {rotulo && <figcaption style={{ fontSize: 14, color: CORES.nota, marginBottom: 6 }}>{rotulo}</figcaption>}
-      <svg viewBox="0 0 240 240" style={{ width: "100%", maxWidth: 320, display: "block", margin: "0 auto" }} role="img">
-        {[0.25, 0.5, 0.75, 1].map((f) => (
-          <polygon key={f} points={eixos.map((_, k) => pt(k, max * f).join(",")).join(" ")} fill="none" stroke="#E4DCC9" />
-        ))}
-        {eixos.map((e, k) => {
-          const [x, y] = pt(k, max * 1.2);
-          return (
-            <g key={e}>
-              <line x1={C} y1={C} x2={pt(k, max)[0]} y2={pt(k, max)[1]} stroke="#E4DCC9" />
-              <text x={x} y={y + 4} fontSize="11" textAnchor="middle" fill={CORES.tinta}>{e}</text>
-            </g>
-          );
-        })}
-        <text x={C + 3} y={C - R * 0.5 + 3} fontSize="9" fill={CORES.nota}>{fmt(max * 0.5, 0)}{sufixo}</text>
-        {series.map((s) => (
-          <g key={s.nome}>
-            <polygon points={s.valores.map((v, k) => pt(k, v || 0).join(",")).join(" ")}
-              fill={s.cor} fillOpacity="0.18" stroke={s.cor} strokeWidth="2.5" strokeDasharray={s.traco || ""} />
-            {s.valores.map((v, k) => (
-              <circle key={k} cx={pt(k, v || 0)[0]} cy={pt(k, v || 0)[1]} r="3.5" fill={s.cor}>
-                <title>{`${s.nome} — ${eixos[k]}: ${fmt(v)}${sufixo}`}</title>
-              </circle>
-            ))}
-          </g>
-        ))}
-      </svg>
-      <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap", marginTop: 4 }}>
-        {series.map((s) => (
-          <span key={s.nome} style={{ fontSize: 14, display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <svg width="26" height="8"><line x1="0" x2="26" y1="4" y2="4" stroke={s.cor} strokeWidth="3" strokeDasharray={s.traco || ""} /></svg>
-            {s.nome}
+    <figure style={{ margin: 0 }}>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 8 }}>
+        {[[nomeA, corA], [nomeB, corB]].map(([n, c]) => (
+          <span key={n} style={{ fontSize: 14, display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 12, height: 12, borderRadius: 3, background: c, display: "inline-block" }} />{n}
           </span>
         ))}
       </div>
+      {itens.map((it) => (
+        <div key={it.rotulo} style={{ display: "grid", gridTemplateColumns: "minmax(80px, 30%) 1fr", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <span style={{ fontSize: 14, textAlign: "right" }}>{it.rotulo}</span>
+          <div style={{ display: "grid", gap: 3 }}>
+            {barra(it.a, corA, nomeA, it.rotulo)}
+            {barra(it.b, corB, nomeB, it.rotulo)}
+          </div>
+        </div>
+      ))}
     </figure>
   );
 }
@@ -2336,7 +2328,7 @@ function GraficoDispersao({ pontos, reta, rotuloX, rotuloY, rotulo, yMin = 1, yM
   return (
     <figure style={{ margin: 0 }} aria-label={rotulo}>
       {rotulo && <figcaption style={{ fontSize: 14, color: CORES.nota, marginBottom: 6 }}>{rotulo}</figcaption>}
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", background: CORES.cartao, borderRadius: 10 }} role="img">
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxHeight: 290, display: "block", background: CORES.cartao, borderRadius: 10 }} role="img">
         {[yMin, (yMin + yMax) / 2, yMax].map((v) => (
           <g key={v}>
             <line x1={esq} x2={W - dir} y1={py(v)} y2={py(v)} stroke="#E4DCC9" />
@@ -2529,17 +2521,17 @@ function forcaCorrelacao(r) {
 function CartaoGrafico({ titulo, sobre, sql, children }) {
   const [verSql, setVerSql] = useState(false);
   return (
-    <section style={{ background: CORES.cartao, border: "2px solid #E4DCC9", borderRadius: 16, padding: 14, minWidth: 0 }}>
+    <section style={{ background: CORES.cartao, border: "2px solid #E4DCC9", borderRadius: 16, padding: 16, minWidth: 0, display: "flex", flexDirection: "column" }}>
       <h3 style={{ fontSize: 18, margin: "0 0 2px" }}>{titulo}</h3>
       {sobre && <p style={{ fontSize: 14, color: CORES.nota, margin: "0 0 10px" }}>{sobre}</p>}
-      {children}
+      <div style={{ flex: 1 }}>{children}</div>
       {sql && (
         <>
-          <button onClick={() => setVerSql(!verSql)} style={{
-            marginTop: 10, fontSize: 14, fontWeight: 700, padding: "6px 10px", borderRadius: 8, cursor: "pointer",
-            border: `2px solid ${CORES.anil}`, background: verSql ? "#E7ECF8" : CORES.cartao, color: CORES.anil,
+          <button onClick={() => setVerSql(!verSql)} aria-expanded={verSql} style={{
+            alignSelf: "flex-start", marginTop: 10, fontSize: 14, fontWeight: 700, padding: "8px 2px", minHeight: 40, cursor: "pointer",
+            border: "none", background: "transparent", color: CORES.anil, textDecoration: "underline", textUnderlineOffset: 3,
             fontFamily: "'Atkinson Hyperlegible', sans-serif",
-          }}>{verSql ? "Esconder SQL" : "🧾 SQL"}</button>
+          }}>{verSql ? "Esconder o SQL" : "Ver o SQL"}</button>
           {verSql && <pre style={{ fontSize: 12, background: "#26201A", color: "#F3EEE0", padding: 10, borderRadius: 10, overflowX: "auto", marginTop: 8, lineHeight: 1.4 }}>{sql}</pre>}
         </>
       )}
@@ -2611,6 +2603,8 @@ function PainelDashboard({ token, demo }) {
   const nomeGrau = filtros.grau === "todos" ? "todos os residentes" : `residentes de grau ${filtros.grau}`;
   const reg = d.regressao || {}, cor = d.correlacao || {};
   const tendMedida = n(reg[`${filtros.medida}_por_semana`]);
+  const artigo = filtros.medida === "dor" ? "a" : "o";
+  const colMedida = filtros.medida === "dor" ? "dor_media" : `${filtros.medida}_medio`;
   const deficit = n(k.cuidadores_necessarios) > n(k.cuidadores_na_equipe);
 
   return (
@@ -2642,32 +2636,40 @@ function PainelDashboard({ token, demo }) {
           detalhe={deficit ? "equipe abaixo do mínimo" : "na equipe / exigidos"} alerta={deficit} />
       </div>
 
-      {/* ---------- Gráficos ---------- */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(330px, 1fr))", gap: 12 }}>
-        <CartaoGrafico titulo={`Como os residentes avaliam ${filtros.medida === "dor" ? "a" : "o"} ${M.rotulo.toLowerCase()} (${M.min} a ${M.max})`}
-          sobre="Quantas vezes cada nota foi marcada nos check-ins, com média, mediana, moda e o quanto as respostas variam."
+      {/* ---------- Gráficos ----------
+          Duas colunas, em pares de altura parecida: distribuição e evolução da medida,
+          composição (grau e intercorrências), atividades, e cuidado (refeições e pressão). */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 400px), 1fr))", gap: 14 }}>
+        <CartaoGrafico titulo={`Como os residentes avaliam ${artigo} ${M.rotulo.toLowerCase()} (${M.min} a ${M.max})`}
+          sobre="Quantas vezes cada nota foi marcada nos check-ins."
           sql={d.sql.histograma + ";\n\n" + d.sql.estatisticas}>
           <GraficoColunas dados={d.histograma.map((h) => ({ rotulo: String(h.valor), valor: n(h.frequencia), extra: `${fmt(h.percentual)}% dos registros` }))}
             marcas={[{ nome: "média", valor: n(e.media), cor: CORES.alerta }, { nome: "mediana", valor: n(e.mediana), cor: CORES.verde, traco: "5 3" }]} />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 10 }}>
-            {[["n", e.n, 0], ["Média", e.media, 2], ["Mediana", e.mediana, 2], ["Moda", e.moda, 0], ["Variância", e.variancia, 2],
-              ["Desvio padrão", e.desvio_padrao, 2], ["Coef. de variação", e.coef_variacao_pct === null ? null : `${fmt(e.coef_variacao_pct)}%`, null],
-              ["Mínimo", e.minimo, 0], ["Máximo", e.maximo, 0]].map(([r, v, c]) => (
-              <div key={r} style={{ background: "#F3EEE0", borderRadius: 8, padding: "6px 8px" }}>
-                <div style={{ fontSize: 12.5, color: CORES.nota }}>{r}</div>
-                <div style={{ fontSize: 17, fontWeight: 700 }}>{c === null ? (v ?? "—") : fmt(v, c)}</div>
-              </div>
-            ))}
-          </div>
+          <p style={{ fontSize: 15, margin: "10px 0 0" }}>
+            Média <b>{fmt(e.media, 2)}</b> · mediana <b>{fmt(e.mediana, 2)}</b> · moda <b>{fmt(e.moda, 0)}</b> · desvio padrão <b>{fmt(e.desvio_padrao, 2)}</b>
+          </p>
+          <details style={{ marginTop: 6 }}>
+            <summary style={{ fontSize: 14, fontWeight: 700, color: CORES.anil, cursor: "pointer", padding: "6px 0" }}>Todas as estatísticas</summary>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 6 }}>
+              {[["n", e.n, 0], ["Média", e.media, 2], ["Mediana", e.mediana, 2], ["Moda", e.moda, 0], ["Variância", e.variancia, 2],
+                ["Desvio padrão", e.desvio_padrao, 2], ["Coef. de variação", e.coef_variacao_pct === null ? null : `${fmt(e.coef_variacao_pct)}%`, null],
+                ["Mínimo", e.minimo, 0], ["Máximo", e.maximo, 0]].map(([r, v, c]) => (
+                <div key={r} style={{ background: "#F3EEE0", borderRadius: 8, padding: "6px 8px" }}>
+                  <div style={{ fontSize: 13, color: CORES.nota }}>{r}</div>
+                  <div style={{ fontSize: 17, fontWeight: 700 }}>{c === null ? (v ?? "—") : fmt(v, c)}</div>
+                </div>
+              ))}
+            </div>
+          </details>
         </CartaoGrafico>
 
-        <CartaoGrafico titulo="Evolução no tempo"
-          sobre={`Média ${filtros.dias <= 30 ? "de cada dia" : "de cada semana"} de humor, conforto e dor, e para onde a medida escolhida está indo.`}
+        <CartaoGrafico titulo={`Evolução ${artigo === "a" ? "da" : "do"} ${M.rotulo.toLowerCase()} no tempo`}
+          sobre={`Média ${filtros.dias <= 30 ? "de cada dia" : "de cada semana"}, na escala de ${M.min} a ${M.max}. Para ver outra medida, troque o filtro Medida.`}
           sql={d.sql.tendencia + ";\n\n" + d.sql.regressao}>
-          {d.tendencia.length ? <GraficoLinhas linhas={d.tendencia} x="periodo" ys={["humor_medio", "conforto_medio", "dor_media"]} rotulo="" /> :
+          {d.tendencia.length ? <GraficoLinhas linhas={d.tendencia} x="periodo" ys={[colMedida]} yMin={M.min} yMax={M.max} legenda={false} /> :
             <p style={{ fontSize: 15, color: CORES.nota }}>Sem check-ins no período.</p>}
           <p style={{ fontSize: 15, margin: "6px 0 0" }}>
-            Tendência de <b>{M.rotulo.toLowerCase()}</b>: {tendMedida === null ? "—" : (
+            Tendência: {tendMedida === null ? "—" : (
               <b style={{ color: Math.abs(tendMedida) < 0.02 ? CORES.nota : (tendMedida > 0) === (M.melhor === "maior") ? CORES.verde : CORES.alerta }}>
                 {tendMedida > 0 ? "+" : ""}{fmt(tendMedida, 3)} ponto(s) por semana
               </b>
@@ -2676,7 +2678,7 @@ function PainelDashboard({ token, demo }) {
         </CartaoGrafico>
 
         <CartaoGrafico titulo="Residentes por grau de dependência"
-          sobre="Toque numa fatia para ver o painel só daquele grau. Toque de novo para voltar a todos."
+          sobre="Toque num grau para ver o painel só dele. Toque de novo para voltar a todos."
           sql={d.sql.residentes_grau}>
           <GraficoPizza rosca selecionado={filtros.grau === "todos" ? null : filtros.grau}
             aoClicar={(g) => setFiltros({ ...filtros, grau: filtros.grau === g ? "todos" : g })}
@@ -2686,21 +2688,21 @@ function PainelDashboard({ token, demo }) {
         <CartaoGrafico titulo="Intercorrências por tipo"
           sobre="Que tipo de ocorrência mais aconteceu no período."
           sql={d.sql.intercorrencias_tipo}>
-          <GraficoPizza dados={d.intercorrencias_tipo.map((t) => ({ rotulo: `${ROTULO_CAT[t.categoria] || t.categoria}${n(t.graves) ? ` (${t.graves} grave)` : ""}`, chave: t.categoria, valor: n(t.total) }))} />
+          {d.intercorrencias_tipo.length ? (
+            <GraficoBarrasH nomeInteiro quebraRotulo x="tipo" y="total" rotulo="Nº de ocorrências"
+              linhas={d.intercorrencias_tipo.map((t) => ({ tipo: `${ROTULO_CAT[t.categoria] || t.categoria}${n(t.graves) ? ` (${t.graves} grave${n(t.graves) > 1 ? "s" : ""})` : ""}`, total: n(t.total) }))} />
+          ) : <p style={{ fontSize: 15, color: CORES.nota }}>Nenhuma intercorrência no período.</p>}
         </CartaoGrafico>
 
         <CartaoGrafico titulo="Participação nas atividades"
           sobre="Quantos residentes (%) foram a pelo menos uma atividade de cada tipo, comparando com o período anterior."
           sql={d.sql.radar_atividades}>
-          <GraficoRadar eixos={d.radar_atividades.map((r) => ROTULO_CAT[r.categoria] || r.categoria)}
-            series={[
-              { nome: `Últimos ${filtros.dias} dias`, cor: CORES.anil, valores: d.radar_atividades.map((r) => n(r.pct_atual)) },
-              { nome: "Período anterior", cor: "#C2701F", traco: "5 4", valores: d.radar_atividades.map((r) => n(r.pct_anterior)) },
-            ]} />
+          <GraficoBarrasPar nomeA={`Últimos ${filtros.dias} dias`} nomeB="Período anterior"
+            itens={d.radar_atividades.map((r) => ({ rotulo: ROTULO_CAT[r.categoria] || r.categoria, a: n(r.pct_atual), b: n(r.pct_anterior) }))} />
         </CartaoGrafico>
 
         <CartaoGrafico titulo="Atividades e humor andam juntos?"
-          sobre="Cada ponto é um residente. A linha tracejada mostra a tendência: quem vai a mais atividades costuma estar de melhor humor?"
+          sobre="Cada ponto é um residente. A linha tracejada mostra a tendência."
           sql={d.sql.dispersao + ";\n\n" + d.sql.correlacao}>
           <GraficoDispersao rotuloX="atividades no período" rotuloY="humor médio"
             pontos={d.dispersao.filter((p) => p.humor_medio !== null).map((p) => ({ x: n(p.atividades), y: n(p.humor_medio), rotulo: p.nome }))}
@@ -2714,7 +2716,7 @@ function PainelDashboard({ token, demo }) {
           sobre="Quanto do prato foi aceito, em média, em cada refeição (0 a 100%)."
           sql={d.sql.refeicoes}>
           {d.refeicoes.length ? (
-            <GraficoColunas sufixo="%" cor={CORES.verde}
+            <GraficoColunas sufixo="%" cor={CORES.verde} teto={100}
               dados={d.refeicoes.map((r) => ({ rotulo: ROTULO_CAT[r.refeicao] || r.refeicao, valor: n(r.aceitacao_media),
                 extra: `desvio padrão ${fmt(r.desvio_padrao)} · ${r.registros} registros · ${r.hidratacao_media_ml} ml de líquido` }))} />
           ) : <p style={{ fontSize: 15, color: CORES.nota }}>Sem refeições registradas no período.</p>}
@@ -2724,7 +2726,7 @@ function PainelDashboard({ token, demo }) {
           sobre="Aferições do período por classificação, segundo a Diretriz Brasileira de Hipertensão."
           sql={d.sql.pressao}>
           {d.pressao.length ? (
-            <GraficoBarrasH linhas={d.pressao.map((p) => ({ classe: p.classe, afericoes: n(p.afericoes) }))} x="classe" y="afericoes" rotulo="Nº de aferições" nomeInteiro />
+            <GraficoBarrasH linhas={d.pressao.map((p) => ({ classe: p.classe, afericoes: n(p.afericoes) }))} x="classe" y="afericoes" rotulo="Nº de aferições" nomeInteiro quebraRotulo />
           ) : <p style={{ fontSize: 15, color: CORES.nota }}>Sem aferições de pressão no período.</p>}
         </CartaoGrafico>
       </div>
