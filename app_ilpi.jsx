@@ -2172,6 +2172,16 @@ function GraficoLinhas({ linhas, x, ys, rotulo, yMin, yMax, legenda = true }) {
 
 // ---------- Gráficos do dashboard (SVG puro, sem biblioteca) ----------
 const PALETA = ["#27418F", "#2E7D46", "#C2701F", "#B3402A", "#6E4C9E", "#1F7F86", "#8A6D1A", "#A34E7C"];
+// Cores do dashboard, cada uma com um só significado:
+//   anil     = o dado do período escolhido (barras, linhas, pontos);
+//   cinza    = o período anterior, só para comparar;
+//   tinta    = linhas de referência (média, mediana, tendência);
+//   verde/vermelho = só melhora/piora e alerta (indicadores e tendência);
+//   graus I, II e III = um mesmo azul, do claro ao escuro, porque são uma ordem, não um juízo.
+const COR_DASH = {
+  atual: CORES.anil, anterior: CORES.cinza, anteriorTexto: CORES.nota, referencia: CORES.tinta,
+  graus: ["#7D93D1", "#4A63B0", "#1B2E66"],
+};
 const fmt = (v, casas = 1) => (v === null || v === undefined || Number.isNaN(Number(v)) ? "—" : Number(v).toLocaleString("pt-BR", { maximumFractionDigits: casas }));
 
 // Pizza ou rosca. Com aoClicar, cada fatia (e o item da legenda) vira um filtro.
@@ -2263,9 +2273,6 @@ function GraficoColunas({ dados, rotulo, marcas = [], cor = CORES.anil, sufixo =
             <rect x={px(k) - larg * 0.38} y={py(d.valor)} width={larg * 0.76} height={H - base - py(d.valor)} rx="3" fill={d.cor || cor}>
               <title>{`${d.rotulo}: ${d.valor}${sufixo}${d.extra ? " · " + d.extra : ""}`}</title>
             </rect>
-            {d.valor > 0 && (H - base - py(d.valor) > 18
-              ? <text x={px(k)} y={py(d.valor) + 13} fontSize="10.5" fontWeight="700" textAnchor="middle" fill="#fff">{d.valor}</text>
-              : <text x={px(k)} y={py(d.valor) - 3} fontSize="10" textAnchor="middle" fill={CORES.tinta}>{d.valor}</text>)}
             <text x={px(k)} y={H - 10} fontSize="10.5" textAnchor="middle" fill={CORES.nota}>{d.rotuloCurto || d.rotulo}</text>
           </g>
         ))}
@@ -2275,25 +2282,31 @@ function GraficoColunas({ dados, rotulo, marcas = [], cor = CORES.anil, sufixo =
           // rótulos alternam lado (esquerda/direita da linha) para não se sobreporem
           return (
             <g key={m.nome}>
+              <line x1={x} x2={x} y1={topo - 6} y2={H - base} stroke={CORES.cartao} strokeWidth="5.5" />
               <line x1={x} x2={x} y1={topo - 6} y2={H - base} stroke={m.cor} strokeWidth="2.5" strokeDasharray={m.traco || ""} />
               <text x={i % 2 ? x + 4 : x - 4} y={topo - 4} fontSize="10" fill={m.cor} fontWeight="700"
                 textAnchor={i % 2 ? "start" : "end"}>{m.nome} {fmt(m.valor, 2)}</text>
             </g>
           );
         })}
+        {/* valores por último, contornados na cor da barra, para ficarem legíveis por cima das marcas */}
+        {dados.map((d, k) => d.valor > 0 && (H - base - py(d.valor) > 18
+          ? <text key={d.rotulo} x={px(k)} y={py(d.valor) + 13} fontSize="10.5" fontWeight="700" textAnchor="middle" fill="#fff"
+              stroke={d.cor || cor} strokeWidth="3" paintOrder="stroke">{d.valor}</text>
+          : <text key={d.rotulo} x={px(k)} y={py(d.valor) - 3} fontSize="10" textAnchor="middle" fill={CORES.tinta}>{d.valor}</text>))}
       </svg>
     </figure>
   );
 }
 
 // Barras em pares: para cada categoria, o período atual e o anterior lado a lado.
-function GraficoBarrasPar({ itens, nomeA, nomeB, corA = CORES.anil, corB = "#C2701F", max = 100, sufixo = "%" }) {
-  const barra = (v, cor, nome, rotulo) => (
+function GraficoBarrasPar({ itens, nomeA, nomeB, corA = COR_DASH.atual, corB = COR_DASH.anterior, corTextoB = COR_DASH.anteriorTexto, max = 100, sufixo = "%" }) {
+  const barra = (v, cor, nome, rotulo, corTexto = cor) => (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 52px", alignItems: "center", gap: 8 }}>
       <div style={{ background: "#EFE8D8", borderRadius: 6, height: 14 }} title={`${nome} — ${rotulo}: ${fmt(v)}${sufixo}`}>
         <div style={{ width: `${Math.max(v ? 1.5 : 0, (100 * (v || 0)) / max)}%`, height: "100%", borderRadius: 6, background: cor }} />
       </div>
-      <span style={{ fontSize: 14, fontWeight: 700, color: cor }}>{fmt(v, 0)}{sufixo}</span>
+      <span style={{ fontSize: 14, fontWeight: 700, color: corTexto }}>{fmt(v, 0)}{sufixo}</span>
     </div>
   );
   return (
@@ -2310,7 +2323,7 @@ function GraficoBarrasPar({ itens, nomeA, nomeB, corA = CORES.anil, corB = "#C27
           <span style={{ fontSize: 14, textAlign: "right" }}>{it.rotulo}</span>
           <div style={{ display: "grid", gap: 3 }}>
             {barra(it.a, corA, nomeA, it.rotulo)}
-            {barra(it.b, corB, nomeB, it.rotulo)}
+            {barra(it.b, corB, nomeB, it.rotulo, corTextoB)}
           </div>
         </div>
       ))}
@@ -2342,7 +2355,7 @@ function GraficoDispersao({ pontos, reta, rotuloX, rotuloY, rotulo, yMin = 1, yM
         <text x={10} y={(H - base) / 2} fontSize="10.5" textAnchor="middle" fill={CORES.tinta} transform={`rotate(-90 10 ${(H - base) / 2})`}>{rotuloY}</text>
         {reta && reta.b !== null && reta.a !== null && (
           <line x1={px(0)} y1={py(Math.min(yMax, Math.max(yMin, reta.a)))} x2={px(xMax)}
-            y2={py(Math.min(yMax, Math.max(yMin, reta.a + reta.b * xMax)))} stroke={CORES.alerta} strokeWidth="2" strokeDasharray="6 4" />
+            y2={py(Math.min(yMax, Math.max(yMin, reta.a + reta.b * xMax)))} stroke={COR_DASH.referencia} strokeWidth="2" strokeDasharray="6 4" />
         )}
         {pontos.map((p, k) => (
           <circle key={k} cx={px(p.x)} cy={py(p.y)} r="5" fill={CORES.anil} fillOpacity="0.7" stroke="#fff">
@@ -2658,7 +2671,7 @@ function PainelDashboard({ token, demo }) {
           sobre="Quantas vezes cada nota foi marcada nos check-ins."
           sql={d.sql.histograma + ";\n\n" + d.sql.estatisticas}>
           <GraficoColunas dados={d.histograma.map((h) => ({ rotulo: String(h.valor), valor: n(h.frequencia), extra: `${fmt(h.percentual)}% dos registros` }))}
-            marcas={[{ nome: "média", valor: n(e.media), cor: CORES.alerta }, { nome: "mediana", valor: n(e.mediana), cor: CORES.verde, traco: "5 3" }]} />
+            marcas={[{ nome: "média", valor: n(e.media), cor: COR_DASH.referencia }, { nome: "mediana", valor: n(e.mediana), cor: COR_DASH.referencia, traco: "5 3" }]} />
           <p style={{ fontSize: 15, margin: "10px 0 0" }}>
             Média <b>{fmt(e.media, 2)}</b> · mediana <b>{fmt(e.mediana, 2)}</b> · moda <b>{fmt(e.moda, 0)}</b> · desvio padrão <b>{fmt(e.desvio_padrao, 2)}</b>
           </p>
@@ -2698,7 +2711,7 @@ function PainelDashboard({ token, demo }) {
           sql={d.sql.residentes_grau}>
           <GraficoPizza rosca selecionado={filtros.grau === "todos" ? null : filtros.grau}
             aoClicar={(g) => setFiltros({ ...filtros, grau: filtros.grau === g ? "todos" : g })}
-            dados={d.residentes_grau.map((g, i) => ({ rotulo: `Grau ${g.categoria}`, chave: g.categoria, valor: n(g.total), cor: [CORES.verde, "#C2701F", CORES.alerta][i] }))} />
+            dados={d.residentes_grau.map((g) => ({ rotulo: `Grau ${g.categoria}`, chave: g.categoria, valor: n(g.total), cor: COR_DASH.graus[["I", "II", "III"].indexOf(String(g.categoria))] || COR_DASH.atual }))} />
         </CartaoGrafico>
         <CartaoGrafico titulo="Intercorrências por tipo"
           sobre="Que tipo de ocorrência mais aconteceu no período."
@@ -2712,7 +2725,7 @@ function PainelDashboard({ token, demo }) {
           sobre="Quanto do prato foi aceito, em média, em cada refeição (0 a 100%)."
           sql={d.sql.refeicoes}>
           {d.refeicoes.length ? (
-            <GraficoColunas sufixo="%" cor={CORES.verde} teto={100}
+            <GraficoColunas sufixo="%" cor={COR_DASH.atual} teto={100}
               dados={d.refeicoes.map((r) => ({ rotulo: ROTULO_CAT[r.refeicao] || r.refeicao, valor: n(r.aceitacao_media),
                 extra: `desvio padrão ${fmt(r.desvio_padrao)} · ${r.registros} registros · ${r.hidratacao_media_ml} ml de líquido` }))} />
           ) : <p style={{ fontSize: 15, color: CORES.nota }}>Sem refeições registradas no período.</p>}
