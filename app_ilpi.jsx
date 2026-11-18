@@ -2518,11 +2518,24 @@ function forcaCorrelacao(r) {
   return `correlação ${sentido} forte`;
 }
 
+// Setor do dashboard: um título, uma frase e os gráficos em duas colunas.
+function Setor({ id, titulo, sobre, children }) {
+  return (
+    <section aria-labelledby={id} style={{ marginTop: 26 }}>
+      <h3 id={id} style={{ fontSize: 21, margin: "0 0 2px", color: CORES.anil }}>{titulo}</h3>
+      <p style={{ fontSize: 15, color: CORES.nota, margin: "0 0 10px" }}>{sobre}</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 400px), 1fr))", gap: 14 }}>
+        {children}
+      </div>
+    </section>
+  );
+}
+
 function CartaoGrafico({ titulo, sobre, sql, children }) {
   const [verSql, setVerSql] = useState(false);
   return (
     <section style={{ background: CORES.cartao, border: "2px solid #E4DCC9", borderRadius: 16, padding: 16, minWidth: 0, display: "flex", flexDirection: "column" }}>
-      <h3 style={{ fontSize: 18, margin: "0 0 2px" }}>{titulo}</h3>
+      <h4 style={{ fontSize: 18, margin: "0 0 2px" }}>{titulo}</h4>
       {sobre && <p style={{ fontSize: 14, color: CORES.nota, margin: "0 0 10px" }}>{sobre}</p>}
       <div style={{ flex: 1 }}>{children}</div>
       {sql && (
@@ -2636,10 +2649,11 @@ function PainelDashboard({ token, demo }) {
           detalhe={deficit ? "equipe abaixo do mínimo" : "na equipe / exigidos"} alerta={deficit} />
       </div>
 
-      {/* ---------- Gráficos ----------
-          Duas colunas, em pares de altura parecida: distribuição e evolução da medida,
-          composição (grau e intercorrências), atividades, e cuidado (refeições e pressão). */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 400px), 1fr))", gap: 14 }}>
+      {/* ---------- Gráficos, em três setores ----------
+          Cada setor responde a uma pergunta do gestor e tem os gráficos em pares
+          de altura parecida (duas colunas no computador, uma no celular). */}
+      <Setor id="setor-bem-estar" titulo="Bem-estar dos residentes"
+        sobre="Como os residentes dizem que estão, a partir dos check-ins.">
         <CartaoGrafico titulo={`Como os residentes avaliam ${artigo} ${M.rotulo.toLowerCase()} (${M.min} a ${M.max})`}
           sobre="Quantas vezes cada nota foi marcada nos check-ins."
           sql={d.sql.histograma + ";\n\n" + d.sql.estatisticas}>
@@ -2662,7 +2676,6 @@ function PainelDashboard({ token, demo }) {
             </div>
           </details>
         </CartaoGrafico>
-
         <CartaoGrafico titulo={`Evolução ${artigo === "a" ? "da" : "do"} ${M.rotulo.toLowerCase()} no tempo`}
           sobre={`Média ${filtros.dias <= 30 ? "de cada dia" : "de cada semana"}, na escala de ${M.min} a ${M.max}. Para ver outra medida, troque o filtro Medida.`}
           sql={d.sql.tendencia + ";\n\n" + d.sql.regressao}>
@@ -2676,7 +2689,10 @@ function PainelDashboard({ token, demo }) {
             )}
           </p>
         </CartaoGrafico>
+      </Setor>
 
+      <Setor id="setor-saude" titulo="Saúde e cuidado"
+        sobre="Quem precisa de mais cuidado e o que aconteceu no período.">
         <CartaoGrafico titulo="Residentes por grau de dependência"
           sobre="Toque num grau para ver o painel só dele. Toque de novo para voltar a todos."
           sql={d.sql.residentes_grau}>
@@ -2684,7 +2700,6 @@ function PainelDashboard({ token, demo }) {
             aoClicar={(g) => setFiltros({ ...filtros, grau: filtros.grau === g ? "todos" : g })}
             dados={d.residentes_grau.map((g, i) => ({ rotulo: `Grau ${g.categoria}`, chave: g.categoria, valor: n(g.total), cor: [CORES.verde, "#C2701F", CORES.alerta][i] }))} />
         </CartaoGrafico>
-
         <CartaoGrafico titulo="Intercorrências por tipo"
           sobre="Que tipo de ocorrência mais aconteceu no período."
           sql={d.sql.intercorrencias_tipo}>
@@ -2693,14 +2708,32 @@ function PainelDashboard({ token, demo }) {
               linhas={d.intercorrencias_tipo.map((t) => ({ tipo: `${ROTULO_CAT[t.categoria] || t.categoria}${n(t.graves) ? ` (${t.graves} grave${n(t.graves) > 1 ? "s" : ""})` : ""}`, total: n(t.total) }))} />
           ) : <p style={{ fontSize: 15, color: CORES.nota }}>Nenhuma intercorrência no período.</p>}
         </CartaoGrafico>
+        <CartaoGrafico titulo="Aceitação alimentar por refeição"
+          sobre="Quanto do prato foi aceito, em média, em cada refeição (0 a 100%)."
+          sql={d.sql.refeicoes}>
+          {d.refeicoes.length ? (
+            <GraficoColunas sufixo="%" cor={CORES.verde} teto={100}
+              dados={d.refeicoes.map((r) => ({ rotulo: ROTULO_CAT[r.refeicao] || r.refeicao, valor: n(r.aceitacao_media),
+                extra: `desvio padrão ${fmt(r.desvio_padrao)} · ${r.registros} registros · ${r.hidratacao_media_ml} ml de líquido` }))} />
+          ) : <p style={{ fontSize: 15, color: CORES.nota }}>Sem refeições registradas no período.</p>}
+        </CartaoGrafico>
+        <CartaoGrafico titulo="Pressão arterial"
+          sobre="Aferições do período por classificação, segundo a Diretriz Brasileira de Hipertensão."
+          sql={d.sql.pressao}>
+          {d.pressao.length ? (
+            <GraficoBarrasH linhas={d.pressao.map((p) => ({ classe: p.classe, afericoes: n(p.afericoes) }))} x="classe" y="afericoes" rotulo="Nº de aferições" nomeInteiro quebraRotulo />
+          ) : <p style={{ fontSize: 15, color: CORES.nota }}>Sem aferições de pressão no período.</p>}
+        </CartaoGrafico>
+      </Setor>
 
+      <Setor id="setor-atividades" titulo="Atividades"
+        sobre="Quem participa das atividades e se isso acompanha o humor.">
         <CartaoGrafico titulo="Participação nas atividades"
           sobre="Quantos residentes (%) foram a pelo menos uma atividade de cada tipo, comparando com o período anterior."
           sql={d.sql.radar_atividades}>
           <GraficoBarrasPar nomeA={`Últimos ${filtros.dias} dias`} nomeB="Período anterior"
             itens={d.radar_atividades.map((r) => ({ rotulo: ROTULO_CAT[r.categoria] || r.categoria, a: n(r.pct_atual), b: n(r.pct_anterior) }))} />
         </CartaoGrafico>
-
         <CartaoGrafico titulo="Atividades e humor andam juntos?"
           sobre="Cada ponto é um residente. A linha tracejada mostra a tendência."
           sql={d.sql.dispersao + ";\n\n" + d.sql.correlacao}>
@@ -2711,25 +2744,7 @@ function PainelDashboard({ token, demo }) {
             r = <b>{fmt(cor.r_pearson, 3)}</b> · r² = {fmt(cor.r2, 3)} · n = {cor.n} → {forcaCorrelacao(n(cor.r_pearson))}.
           </p>
         </CartaoGrafico>
-
-        <CartaoGrafico titulo="Aceitação alimentar por refeição"
-          sobre="Quanto do prato foi aceito, em média, em cada refeição (0 a 100%)."
-          sql={d.sql.refeicoes}>
-          {d.refeicoes.length ? (
-            <GraficoColunas sufixo="%" cor={CORES.verde} teto={100}
-              dados={d.refeicoes.map((r) => ({ rotulo: ROTULO_CAT[r.refeicao] || r.refeicao, valor: n(r.aceitacao_media),
-                extra: `desvio padrão ${fmt(r.desvio_padrao)} · ${r.registros} registros · ${r.hidratacao_media_ml} ml de líquido` }))} />
-          ) : <p style={{ fontSize: 15, color: CORES.nota }}>Sem refeições registradas no período.</p>}
-        </CartaoGrafico>
-
-        <CartaoGrafico titulo="Pressão arterial"
-          sobre="Aferições do período por classificação, segundo a Diretriz Brasileira de Hipertensão."
-          sql={d.sql.pressao}>
-          {d.pressao.length ? (
-            <GraficoBarrasH linhas={d.pressao.map((p) => ({ classe: p.classe, afericoes: n(p.afericoes) }))} x="classe" y="afericoes" rotulo="Nº de aferições" nomeInteiro quebraRotulo />
-          ) : <p style={{ fontSize: 15, color: CORES.nota }}>Sem aferições de pressão no período.</p>}
-        </CartaoGrafico>
-      </div>
+      </Setor>
     </div>
   );
 }
