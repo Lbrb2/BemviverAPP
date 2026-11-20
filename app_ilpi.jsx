@@ -3346,6 +3346,8 @@ export default function BemViverILPI() {
           outline: 4px solid #27418F; outline-offset: 2px;
         }
         @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+        /* no celular, o cabeçalho fica só com o nome: a marca roubaria espaço dos botões */
+        @media (max-width: 520px) { .marca-cabecalho { display: none; } }
       `}</style>
 
       <header style={{
@@ -3354,7 +3356,7 @@ export default function BemViverILPI() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           {/* Marca do Bem Viver: desenho feito por um artista para o projeto (original em docs/logo_desenho_original.jpg) */}
-          <img src="/logo-marca.svg" alt="" aria-hidden="true" style={{ height: 50, width: "auto", flexShrink: 0 }}
+          <img className="marca-cabecalho" src="/logo-marca.svg" alt="" aria-hidden="true" style={{ height: 50, width: "auto", flexShrink: 0 }}
             onError={(e) => { e.currentTarget.style.display = "none"; }} />
           <div style={{ minWidth: 0 }}>
           <div style={{ fontFamily: "'Alfa Slab One', serif", fontSize: 24, color: CORES.anil }}>Bem Viver ILPI</div>
