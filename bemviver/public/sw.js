@@ -1,8 +1,8 @@
 // Service worker do Bem Viver ILPI — casca do app disponível offline.
 // A API (outra origem) nunca é interceptada: escritas offline ficam
 // na fila do próprio app e sobem quando a conexão volta.
-const CACHE = "bemviver-v1";
-const CASCA = ["/", "/index.html", "/manifest.webmanifest", "/icone.svg"];
+const CACHE = "bemviver-v2";
+const CASCA = ["/", "/index.html", "/manifest.webmanifest", "/icone.svg", "/icone-192.png", "/logo-marca.svg", "/logo-desenho.svg"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CASCA)).then(() => self.skipWaiting()));

@@ -99,6 +99,8 @@ npm run dev                      # app em http://localhost:5173
 
 A API é procurada em `localhost:3000`; para outro endereço, defina `VITE_API_URL`. Sem a API no ar, o botão "Ver demonstração" mantém o app navegável.
 
+A marca do app é um desenho feito por um artista para o projeto (original em `docs/logo_desenho_original.jpg`), vetorizado em `bemviver/public/`: `logo-desenho.svg` na tela de entrada, `logo-marca.svg` no cabeçalho e os ícones do app instalado (`icone.svg`, `icone-192.png`, `icone-512.png`, `icone-maskable-512.png` e `apple-touch-icon.png`).
+
 Todos os usuários do seed autenticam com a senha `demo123`:
 
 ```

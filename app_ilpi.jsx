@@ -3349,16 +3349,21 @@ export default function BemViverILPI() {
       `}</style>
 
       <header style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
         padding: "14px 18px", borderBottom: `3px solid ${CORES.tinta}`, background: CORES.cartao,
       }}>
-        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          {/* Marca do Bem Viver: desenho feito por um artista para o projeto (original em docs/logo_desenho_original.jpg) */}
+          <img src="/logo-marca.svg" alt="" aria-hidden="true" style={{ height: 50, width: "auto", flexShrink: 0 }}
+            onError={(e) => { e.currentTarget.style.display = "none"; }} />
+          <div style={{ minWidth: 0 }}>
           <div style={{ fontFamily: "'Alfa Slab One', serif", fontSize: 24, color: CORES.anil }}>Bem Viver ILPI</div>
           {perfil && (
             <div style={{ fontSize: 15, color: CORES.nota }}>
               {demo ? "demonstração" : ehGestor ? "gestão da ILPI" : { idoso: "área do idoso", responsavel: "área do responsável", profissional: "área da equipe" }[perfil]}
             </div>
           )}
+          </div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <button aria-pressed={voz} aria-label={voz ? "Desligar a leitura em voz alta" : "Ligar a leitura em voz alta"}
@@ -3399,6 +3404,10 @@ export default function BemViverILPI() {
       {/* ---------- LOGIN ---------- */}
       {!perfil && (
         <main style={{ maxWidth: 480, margin: "0 auto", padding: 22 }}>
+          <img src="/logo-desenho.svg"
+            alt="Desenho de duas senhoras: uma sentada numa cadeira de rodas e outra em pé ao lado, com a mão no ombro dela"
+            style={{ display: "block", height: 190, width: "auto", margin: "6px auto 4px" }}
+            onError={(e) => { e.currentTarget.style.display = "none"; }} />
           <p style={{ fontSize: 20, textAlign: "center", margin: "10px 0 18px" }}>
             Acompanhamento de bem-estar nos lares de Pernambuco.
           </p>
